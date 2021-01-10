@@ -25,8 +25,9 @@ $ docker build -t ptzcontrol:11.1 .
 
 ## Running
 
-Assuming the webcam/video feed is available at `/dev/video0`...
-If you have ffmpeg with NDI support, the following works (limiting to 10 FPS to reduce processing later...):
+Running it assumes the webcam/video feed is available at `/dev/video0`...
+
+If you have ffmpeg with NDI support, the following will work to expose it as a video device (limiting to 10 FPS to reduce processing later):
 ```
 sudo modprobe v4l2loopback
 ffmpeg -f libndi_newtek -extra_ips "10.1.1.174" -i "BIRDDOG-ABC123 (CAM)" -vf "fps=fps=10" -pix_fmt yuv420p -f v4l2 /dev/video0
@@ -38,10 +39,10 @@ At this point *an MQTT broker is required*, even if you aren't using any form of
 docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mosquitto 
 ```
 
-Launch the PTZ control container.  
-Set VISCA_IP to the camera's IP/hostname  
-MQTT_HOST to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
-CONTROL=1 causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a StreamDeck).  
+**Launch the PTZ control container:**
+* Set `VISCA_IP` to the camera's IP/hostname
+* Set `MQTT_HOST` to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
+* Set `CONTROL=1` causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a StreamDeck).  
 
 ```
 $ docker run --gpus all --name ptztrack --restart unless-stopped -it \
@@ -74,7 +75,7 @@ If you have a StreamDeck running BitFocus Companion its straightforward to add a
 * Add a new instance of "Generic MQTT".
 * Configure it with Protocol: `mqtt://`, Broker IP: (As above, probably the control computer IP) and Port: `1883`.
 * Add a new Regular Button.
-* To show the camera state:
+* To show the camera state on the button:
   * In Instance Feedback add `mqtt: Change colors from MQTT topic value`.
   * Set the Topic to `PTZ_STATE`.
   * Set the Value to either `on` or `off` depending on what you want the button to show.
@@ -89,7 +90,9 @@ If you have a StreamDeck running BitFocus Companion its straightforward to add a
 | `control on`     | Turn automatic control on |
 | `control off`    | Turn automatic control off |
 | `control toggle` | Toggle the state of the automatic control |
-| `control state`  | Force the program to re-broadcast the current control state (Probably never needed - it does this automatically every 50 frames anyway)
+| `control state`  | Force the program to republish the current control state (it does this automatically every 50 frames anyway)
+
+![Compaion config screenshot](https://raw.githubusercontent.com/Cameron-D/openpose-ptz-control/main/Companion.png)
 
 ## Viewing the processed output
 
@@ -101,7 +104,7 @@ Open up X rendering to everyone (probably unsafe in untrusted environments):
 $ xhost +
 ```
 
-Launch the docker container with access to host computer resources:
+Launch the docker container with access to required host computer resources:
 
 ```
 $ docker run --gpus all --name ptztrack \
@@ -111,7 +114,7 @@ $ docker run --gpus all --name ptztrack \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -e VISCA_IP=10.1.1.174 \
     -e MQTT_HOST=10.1.1.175 \
-    - CONTROL=1 \
+    -e CONTROL=1 \
     -e SHOW_UI=1 \
     --device /dev/video0 ptztrack:11.1
 ```
