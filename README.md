@@ -120,3 +120,5 @@ $ docker run --gpus all --name ptztrack \
 ```
 
 After a moment a window should pop up with blue lines representing the movement edges, people marked in colours, a green box around the people and a blue point in the middle. If the blue point is outside the edges the camera will move in the required direction. Press Q to exit.
+
+![Live preview screenshot](https://raw.githubusercontent.com/Cameron-D/openpose-ptz-control/main/Preview.png)
