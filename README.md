@@ -1,2 +1,121 @@
-# openpose-ptz-control
-Follow a person with a PTZ camera using openpose for people recognition
+# Openpose PTZ control
+
+Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to identify people in an video feed (currently only via webcamera) and issue VISCA over IP PTZ commands to a networked camera. MQTT is used to issue commands to turn the control on/off.
+
+Currently tested and used with a BirdDog P200 using `ffmpeg` with NDI support to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake.
+
+It only tracks the first person it finds, and only moves left/right.
+
+This is the third iteration of this program, after trying various face/people tracking options.
+
+## Setup
+
+* [Install Docker and nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#installing-on-ubuntu-and-debian), and confirm it works.
+* Clone or download this repository:
+```
+$ wget -O openpose-ptz-control.tar.gz https://github.com/Cameron-D/openpose-ptz-control/archive/main.tar.gz
+$ tar xvf openpose-ptz-control.tar.gz
+```
+* Build the docker container
+```
+$ cd openpose-ptz-control
+$ docker build -t ptzcontrol:11.1 .
+```
+* Wait a while for it to download and build...
+
+## Running
+
+Assuming the webcam/video feed is available at `/dev/video0`...
+If you have ffmpeg with NDI support, the following works (limiting to 10 FPS to reduce processing later...):
+```
+sudo modprobe v4l2loopback
+ffmpeg -f libndi_newtek -extra_ips "10.1.1.174" -i "BIRDDOG-ABC123 (CAM)" -vf "fps=fps=10" -pix_fmt yuv420p -f v4l2 /dev/video0
+```
+
+At this point *an MQTT broker is required*, even if you aren't using any form of toggle to turn the automatic control on/off.
+
+```
+docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mosquitto 
+```
+
+Launch the PTZ control container.  
+Set VISCA_IP to the camera's IP/hostname  
+MQTT_HOST to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
+CONTROL=1 causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a StreamDeck).  
+
+```
+$ docker run --gpus all --name ptztrack --restart unless-stopped -it \
+    -e VISCA_IP=10.1.1.174 \
+    -e MQTT_HOST=10.1.1.175 \
+    -e CONTROL=1 \
+    --device /dev/video0 ptztrack:11.1
+```
+
+If all goes well it should start up with no errors, print out in the console when it's moving, and actually move the camera.
+
+## Configuration Options
+
+There are a handful of parameters that can be configured and passed to the container on launch via environment variables (through `-e`).
+
+Options in **bold** are required.
+
+| Option          | Default       | Description |
+| --------------- | ------------- | ----------- |
+| **VISCA_IP**    | 192.168.1.134 | IP address of the PTZ camera |
+| VISCA_PORT      | 52381         | Port that camera accepts VISCA commands on |
+| **MQTT_HOST**   | 10.1.1.175    | IP address of MQTT broker |
+| CONTROL         | None          | Whether to start controlling the camera automatically or wait for a start command |
+| BOUNDARY        | 0.35          | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side) |
+| NET_RESOLUTION  | -1x128        | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
+| SHOW_UI         | None          | Show the processed video in a window. Requires futher setup (see below) |
+
+## Companion Setup
+
+If you have a StreamDeck running BitFocus Companion its straightforward to add a button to show and toggle the automatic control state.
+
+* Add a new instance of "Generic MQTT".
+* Configure it with Protocol: `mqtt://`, Broker IP: (As above, probably the control computer IP) and Port: `1883`.
+* Add a new Regular Button.
+* To show the camera state:
+..* In Instance Feedback add `mqtt: Change colors from MQTT topic value`.
+..* Set the Topic to `PTZ_STATE`.
+..* Set the Value to either `on` or `off` depending on what you want the button to show.
+..* Set colours as desired.
+* To turn the control on/off:
+..* Add a new Key Down/On action of `mqtt: Publish Message`
+..* Set the topic to `PTZ_SETSTATE`
+..* Set the Payload to one of the following:
+
+| Payload        | Description |
+| -------------- | ----------- |
+| control on     | Turn automatic control on |
+| control off    | Turn automatic control off |
+| control toggle | Toggle the state of the automatic control |
+| control state  | Force the program to re-broadcast the current control state (Probably never needed - it does this automatically every 50 frames anyway)
+
+## Viewing the processed output
+
+Nice to confirm what the program is actually seeing, but displaying windows from in Docker requires several changes (some which introduce possible security issues).
+
+Open up X rendering to everyone (probably unsafe in untrusted environments):
+
+```
+$ xhost +
+```
+
+Launch the docker container with access to host computer resources:
+
+```
+$ docker run --gpus all --name ptztrack \
+    --rm -it \
+    --net=host --ipc=host \
+    -e DISPLAY=$DISPLAY \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -e VISCA_IP=10.1.1.174 \
+    -e MQTT_HOST=10.1.1.175 \
+    - CONTROL=1 \
+    -e SHOW_UI=1 \
+    --device /dev/video0 ptztrack:11.1
+```
+
+After a moment a window should pop up with blue lines representing the movement edges, people marked in colours, a green box around the people and a blue point in the middle. If the blue point is outside the edges the camera will move in the required direction. Press Q to exit.
