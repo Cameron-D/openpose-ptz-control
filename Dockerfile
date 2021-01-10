@@ -39,5 +39,4 @@ ENV LD_LIBRARY_PATH=/openpose/build/python/openpose
 WORKDIR /ptztrack
 COPY pose.py .
 
-EXPOSE 5000
 CMD ["python3", "pose.py"]

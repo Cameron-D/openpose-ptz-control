@@ -20,13 +20,14 @@ MQTT_HOST = os.getenv('MQTT_HOST', "10.1.1.175")
 SHOW_UI = os.getenv('SHOW_UI', False)
 CONTROL = os.getenv('CONTROL', False)
 
+BOUNDARY = float(os.getenv('BOUNDARY', .35))
+
+NET_RESOLUTION = os.getenv('NET_RESOLUTION', "-1x128")
+
 VISCA_SEQUENCE = '02 00 00 01 00 00 00 01 01'
 VISCA_LEFT = '81 01 06 01 02 02 01 03 FF'
 VISCA_RIGHT = '81 01 06 01 02 02 02 03 FF'
 VISCA_STOP = '81 01 06 01 02 02 03 03 FF'
-
-SCALE = int(os.getenv('SCALE', 3))
-DIV = 1/SCALE
 
 direction = Move.STOP
 last_direction = direction
@@ -35,7 +36,7 @@ control_camera = True if CONTROL else False
 
 # VISCA Setep
 sequence_number = 1
-visca_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # IPv4, UDP
+visca_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Processing Setup
 bounding = [0, 0, 0, 0]
@@ -46,7 +47,7 @@ video_capture = cv2.VideoCapture(0)
 # OpenPose Setep
 params = dict()
 params["model_folder"] = "/openpose/models"
-params["net_resolution"] = "-1x128"
+params["net_resolution"] = NET_RESOLUTION
 
 opWrapper = op.WrapperPython()
 opWrapper.configure(params)
@@ -147,11 +148,9 @@ while video_capture.isOpened():
     frame = cv2.resize(frame, (1280, 720))
 
     if ret:
-        l_edge = int(frame.shape[1] * .35)
+        l_edge = int(frame.shape[1] * BOUNDARY)
         r_edge = frame.shape[1] - l_edge
         height = frame.shape[0]
-        small_frame = frame
-        small_frame = cv2.resize(small_frame, (0, 0), fx=DIV, fy=DIV)
 
         bounding[0] = frame.shape[1]
         bounding[1] = frame.shape[0]
@@ -162,28 +161,21 @@ while video_capture.isOpened():
             regions = []
 
             datum = op.Datum()
-            datum.cvInputData = small_frame
+            datum.cvInputData = frame
             opWrapper.emplaceAndPop(op.VectorDatum([datum]))
             
-            small_frame = datum.cvOutputData
+            frame = datum.cvOutputData
                         
             for i in range(0, datum.poseKeypoints.shape[0]):
                 p = getKeypointsRectangle(datum.poseKeypoints[i], 0.1)
                 regions.append([p[0], p[1], p[2]-p[0], p[3]-p[1]])
-                #cv2.rectangle(small_frame, (p[0], p[1]), (p[2], p[3]), (0, 255, 0), 2)
+                #cv2.rectangle(frame, (p[0], p[1]), (p[2], p[3]), (0, 255, 0), 2)
 
         #process_this_frame = not process_this_frame
 
         # Drawing the regions in the
         # Image
         for (x, y, w, h) in regions:
-            x *= SCALE
-            y *= SCALE
-            w *= SCALE
-            h *= SCALE
-            #cv2.rectangle(frame, (x, y),
-            #              (x + w, y + h),
-            #              (0, 0, 255), 2)
             if x < bounding[0]:
                 bounding[0] = x
             if y < bounding[1]:
@@ -229,8 +221,7 @@ while video_capture.isOpened():
         # Showing the output Image
         if SHOW_UI:
             frame = cv2.resize(frame, (1280, 720))
-            cv2.imshow("Full", frame)
-            cv2.imshow("Processed", small_frame)
+            cv2.imshow("Frame", frame)
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 break
 

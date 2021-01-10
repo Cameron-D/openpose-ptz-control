@@ -77,14 +77,14 @@ If you have a StreamDeck running BitFocus Companion its straightforward to add a
 * Configure it with Protocol: `mqtt://`, Broker IP: (As above, probably the control computer IP) and Port: `1883`.
 * Add a new Regular Button.
 * To show the camera state:
-..* In Instance Feedback add `mqtt: Change colors from MQTT topic value`.
-..* Set the Topic to `PTZ_STATE`.
-..* Set the Value to either `on` or `off` depending on what you want the button to show.
-..* Set colours as desired.
+  * In Instance Feedback add `mqtt: Change colors from MQTT topic value`.
+  * Set the Topic to `PTZ_STATE`.
+  * Set the Value to either `on` or `off` depending on what you want the button to show.
+  * Set colours as desired.
 * To turn the control on/off:
-..* Add a new Key Down/On action of `mqtt: Publish Message`
-..* Set the topic to `PTZ_SETSTATE`
-..* Set the Payload to one of the following:
+  * Add a new Key Down/On action of `mqtt: Publish Message`
+  * Set the topic to `PTZ_SETSTATE`
+  * Set the Payload to one of the following:
 
 | Payload        | Description |
 | -------------- | ----------- |
