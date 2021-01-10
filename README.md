@@ -57,17 +57,15 @@ If all goes well it should start up with no errors, print out in the console whe
 
 There are a handful of parameters that can be configured and passed to the container on launch via environment variables (through `-e`).
 
-Options in **bold** are required.
-
-| Option          | Default       | Description |
-| --------------- | ------------- | ----------- |
-| **VISCA_IP**    | 192.168.1.134 | IP address of the PTZ camera |
-| VISCA_PORT      | 52381         | Port that camera accepts VISCA commands on |
-| **MQTT_HOST**   | 10.1.1.175    | IP address of MQTT broker |
-| CONTROL         | None          | Whether to start controlling the camera automatically or wait for a start command |
-| BOUNDARY        | 0.35          | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side) |
-| NET_RESOLUTION  | -1x128        | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
-| SHOW_UI         | None          | Show the processed video in a window. Requires futher setup (see below) |
+| Option            | Default       | Description |
+| ----------------- | ------------- | ----------- |
+| `VISCA_IP` (Required) | 192.168.1.134 | IP address of the PTZ camera |
+| `VISCA_PORT `     | 52381         | Port that camera accepts VISCA commands on |
+| `MQTT_HOST` (Required) | 10.1.1.175    | IP address of MQTT broker |
+| `CONTROL  `       | None          | Whether to start controlling the camera automatically or wait for a start command |
+| `BOUNDARY `       | 0.35          | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side) |
+| `NET_RESOLUTION`  | -1x128        | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
+| `SHOW_UI`         | None          | Show the processed video in a window. Requires futher setup (see below) |
 
 ## Companion Setup
 
@@ -86,12 +84,12 @@ If you have a StreamDeck running BitFocus Companion its straightforward to add a
   * Set the topic to `PTZ_SETSTATE`
   * Set the Payload to one of the following:
 
-| Payload        | Description |
-| -------------- | ----------- |
-| control on     | Turn automatic control on |
-| control off    | Turn automatic control off |
-| control toggle | Toggle the state of the automatic control |
-| control state  | Force the program to re-broadcast the current control state (Probably never needed - it does this automatically every 50 frames anyway)
+| Payload          | Description |
+| ---------------- | ----------- |
+| `control on`     | Turn automatic control on |
+| `control off`    | Turn automatic control off |
+| `control toggle` | Toggle the state of the automatic control |
+| `control state`  | Force the program to re-broadcast the current control state (Probably never needed - it does this automatically every 50 frames anyway)
 
 ## Viewing the processed output
 
