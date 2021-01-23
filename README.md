@@ -54,6 +54,16 @@ $ docker run --gpus all --name ptztrack --restart unless-stopped -it \
 
 If all goes well it should start up with no errors, print out in the console when it's moving, and actually move the camera.
 
+## WIshlist of things I might add one day
+
+* Smooth acceleration for panning (start slow, accelerate if the person nears the edges of the frame)
+* Support for multiple people in view, but following only one
+* Read direct NDI frames rather than relying on a custom build of ffmpeg and v4l2loopback
+* Track a persons head rather than the full body bounding box
+* An alternative library for people detection (i.e. tf-pose-estimation seems to be faster?)
+* Support for multiple people in view, and zooming to keep them all in frame...
+
+
 ## Configuration Options
 
 There are a handful of parameters that can be configured and passed to the container on launch via environment variables (through `-e`).
