@@ -13,7 +13,7 @@ class Move(Enum):
     RIGHT = 2
 
 VISCA_IP = os.getenv('VISCA_IP', "192.168.1.134")
-VISCA_PORT = int(os.getenv('VISCA_IP', 52381))
+VISCA_PORT = int(os.getenv('VISCA_PORT', 52381))
 
 MQTT_HOST = os.getenv('MQTT_HOST', "10.1.1.175")
 
