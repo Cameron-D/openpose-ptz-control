@@ -30,7 +30,7 @@ VISCA_RIGHT = '81 01 06 01 02 02 02 03 FF'
 VISCA_STOP = '81 01 06 01 02 02 03 03 FF'
 
 direction = Move.STOP
-last_direction = direction
+last_direction = None
 
 control_camera = True if CONTROL else False
 
