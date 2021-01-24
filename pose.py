@@ -133,6 +133,7 @@ def sigint_handler(signal_received, frame):
     print('Program exit requested... Exiting gracefully')
     control_camera = False
     mqttc.publish("PTZ_STATE", move_state())
+    send_visca_packet(VISCA_STOP)
     time.sleep(0.1)
     mqttc.loop_stop()
     video_capture.release() 
