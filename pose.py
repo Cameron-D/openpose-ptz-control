@@ -72,6 +72,10 @@ def mqtt_message(client, userdata, message):
         control_camera = not control_camera
         mqttc.publish("PTZ_STATE", move_state())
     
+    if control_camera == False:
+        bounding = [0, 0, 0, 0]
+        regions = []
+    
 
 mqttc = mqtt.Client("PTZTrack")
 mqttc.connect(MQTT_HOST)
