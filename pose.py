@@ -196,14 +196,9 @@ while video_capture.isOpened():
         by1 = int(bounding[1])
         bx2 = int(bounding[2])
         by2 = int(bounding[3])
-        cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 200, 0), 2)
-
+        
         lrmiddle = int(((bounding[2] - bounding[0]) / 2) + bounding[0])
         udmiddle = int(((bounding[3] - bounding[1]) / 2) + bounding[1])
-        
-        cv2.rectangle(frame, (lrmiddle-1, udmiddle-1), (lrmiddle+1, udmiddle+1), (255, 255, 0), 4)
-
-        cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
         
         if(lrmiddle < l_edge):
             direction = Move.LEFT
@@ -226,6 +221,9 @@ while video_capture.isOpened():
    
         # Showing the output Image
         if SHOW_UI:
+            cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 200, 0), 2)
+            cv2.rectangle(frame, (lrmiddle-1, udmiddle-1), (lrmiddle+1, udmiddle+1), (255, 255, 0), 4)
+            cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
             frame = cv2.resize(frame, (1280, 720))
             cv2.imshow("Frame", frame)
             if cv2.waitKey(25) & 0xFF == ord('q'):
