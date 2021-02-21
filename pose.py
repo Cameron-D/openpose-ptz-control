@@ -171,7 +171,7 @@ while video_capture.isOpened():
             
             frame = datum.cvOutputData
                         
-            if datum.poseKeypoints.shape:
+            if datum.poseKeypoints:
                 for i in range(0, datum.poseKeypoints.shape[0]):
                     p = getKeypointsRectangle(datum.poseKeypoints[i], 0.1)
                     regions.append([p[0], p[1], p[2]-p[0], p[3]-p[1]])
