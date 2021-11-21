@@ -2,7 +2,7 @@
 
 Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to identify people in an video feed (currently only via webcamera) and issue VISCA over IP PTZ commands to a networked camera. MQTT is used to issue commands to turn the control on/off.
 
-Currently tested and used with a BirdDog P200 using `ffmpeg` with NDI support to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake.
+Currently tested and used with a BirdDog P200 using `ffmpeg` with NDI support to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake.
 
 It only tracks the first person it finds, and only moves left/right.
 
@@ -21,7 +21,7 @@ $ tar xvf openpose-ptz-control.tar.gz
 $ cd openpose-ptz-control
 $ docker build -t ptzcontrol:11.1 .
 ```
-* Wait a while for it to download and build...
+* Wait a while for it to download and build... ☕
 
 ## Running
 
@@ -73,10 +73,10 @@ There are a handful of parameters that can be configured and passed to the conta
 | `VISCA_IP` (Required) | 192.168.1.134 | IP address of the PTZ camera |
 | `VISCA_PORT `     | 52381         | Port that camera accepts VISCA commands on |
 | `MQTT_HOST` (Required) | 10.1.1.175    | IP address of MQTT broker |
-| `CONTROL  `       | None          | Whether to start controlling the camera automatically or wait for a start command |
+| `CONTROL  `       | False          | Whether to start controlling the camera automatically or wait for a start command |
 | `BOUNDARY `       | 0.35          | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side) |
 | `NET_RESOLUTION`  | -1x128        | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
-| `SHOW_UI`         | None          | Show the processed video in a window. Requires futher setup (see below) |
+| `SHOW_UI`         | False          | Show the processed video in a window. Requires futher setup (see below) |
 
 ## Companion Setup
 
