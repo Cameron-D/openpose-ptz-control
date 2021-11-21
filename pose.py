@@ -31,8 +31,6 @@ BOUNDARY = float(os.getenv('BOUNDARY', .35))
 
 NET_RESOLUTION = os.getenv('NET_RESOLUTION', "-1x128")
 
-direction = Move.STOP
-
 control_camera = True if CONTROL else False
 
 # VISCA Setep
@@ -222,9 +220,8 @@ def calculate_boundaries(bounding, regions):
     return bounding
 
 def main_loop():
-    global direction
-
     bounding = []
+    direction = Move.STOP
     last_direction = direction
     frame_count = 0
 
@@ -244,19 +241,22 @@ def main_loop():
 
         frame, regions = process_datum_keypoints(frame, openpose_datum)
 
-        bounding = calculate_boundaries(bounding, regions)
+        if len(regions) > 0:
+            bounding = calculate_boundaries(bounding, regions)
 
-        lrmiddle = int(((bounding[Edge.RIGHT] - bounding[Edge.LEFT]) / 2) + bounding[Edge.LEFT])
-        udmiddle = int(((bounding[Edge.BOTTOM] - bounding[Edge.TOP]) / 2) + bounding[Edge.TOP])
+            lrmiddle = int(((bounding[Edge.RIGHT] - bounding[Edge.LEFT]) / 2) + bounding[Edge.LEFT])
+            udmiddle = int(((bounding[Edge.BOTTOM] - bounding[Edge.TOP]) / 2) + bounding[Edge.TOP])
 
-        cv2.rectangle(frame, (bounding[Edge.LEFT], bounding[Edge.TOP]), (bounding[Edge.RIGHT], bounding[Edge.BOTTOM]), (0, 200, 0), 2)
-        cv2.rectangle(frame, (lrmiddle-1, udmiddle-1), (lrmiddle+1, udmiddle+1), (255, 255, 0), 4)
-        cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
+            cv2.rectangle(frame, (bounding[Edge.LEFT], bounding[Edge.TOP]), (bounding[Edge.RIGHT], bounding[Edge.BOTTOM]), (0, 200, 0), 2)
+            cv2.rectangle(frame, (lrmiddle-1, udmiddle-1), (lrmiddle+1, udmiddle+1), (255, 255, 0), 4)
+            cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
 
-        if(lrmiddle < l_edge):
-            direction = Move.LEFT
-        elif (lrmiddle > r_edge):
-            direction = Move.RIGHT
+            if(lrmiddle < l_edge):
+                direction = Move.LEFT
+            elif (lrmiddle > r_edge):
+                direction = Move.RIGHT
+            else:
+                direction = Move.STOP
         else:
             direction = Move.STOP
         
