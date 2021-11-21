@@ -56,27 +56,29 @@ If all goes well it should start up with no errors, print out in the console whe
 
 ## WIshlist of things I might add one day
 
-* Smooth acceleration for panning (start slow, accelerate if the person nears the edges of the frame)
+* ✅ Smooth acceleration for panning (start slow, accelerate if the person nears the edges of the frame)
 * Support for multiple people in view, but following only one
 * Read direct NDI frames rather than relying on a custom build of ffmpeg and v4l2loopback
 * Track a persons head rather than the full body bounding box
 * An alternative library for people detection (i.e. tf-pose-estimation seems to be faster?)
-* Support for multiple people in view, and zooming to keep them all in frame...
+* ~~Support for multiple people in view, and zooming to keep them all in frame...~~
 
 
 ## Configuration Options
 
 There are a handful of parameters that can be configured and passed to the container on launch via environment variables (through `-e`).
 
-| Option            | Default       | Description |
-| ----------------- | ------------- | ----------- |
-| `VISCA_IP` (Required) | 192.168.1.134 | IP address of the PTZ camera |
-| `VISCA_PORT `     | 52381         | Port that camera accepts VISCA commands on |
-| `MQTT_HOST` (Required) | 10.1.1.175    | IP address of MQTT broker |
-| `CONTROL  `       | False          | Whether to start controlling the camera automatically or wait for a start command |
-| `BOUNDARY `       | 0.35          | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side) |
-| `NET_RESOLUTION`  | -1x128        | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
-| `SHOW_UI`         | False          | Show the processed video in a window. Requires futher setup (see below) |
+| Option            | Default        | Description |
+| ----------------- | -------------- | ----------- |
+| `VISCA_IP` (Required) | 192.168.1.134 | IP address of the PTZ camera. IP or hostname accepted |
+| `VISCA_PORT `     | 52381          | Port that camera accepts VISCA commands on |
+| `MQTT_HOST` (Required) | 10.1.1.175    | IP address of MQTT broker. IP or hostname accepted |
+| `CONTROL  `       | False          | Whether to start controlling the camera automatically or wait for a start command. Use `True` or `False`. |
+| `BOUNDARY `       | 0.35           | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side). 0 - 0.5 accepted. |
+| `NET_RESOLUTION`  | -1x128         | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
+| `SHOW_UI`         | False          | Show the processed video in a window. Requires futher setup (see below). Use `True` or `False`. |
+| `MIN_SPEED`       | 1              | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than MAX_SPEED |
+| `MAX_SPEED        | 16             | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than MIN_SPEED | 
 
 ## Companion Setup
 

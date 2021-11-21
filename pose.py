@@ -28,6 +28,8 @@ SHOW_UI = bool(os.getenv('SHOW_UI', False))
 CONTROL = bool(os.getenv('CONTROL', False))
 
 BOUNDARY = float(os.getenv('BOUNDARY', .35))
+MIN_SPEED = int(os.getenv('MIN_SPEED', 1))
+MAX_SPEED = int(os.getenv('MAX_SPEED', 12))
 
 NET_RESOLUTION = os.getenv('NET_RESOLUTION', "-1x128")
 
@@ -36,9 +38,10 @@ control_camera = True if CONTROL else False
 # VISCA Setep
 sequence_number = 1
 VISCA_SEQUENCE_RESET = '02 00 00 01 00 00 00 01 01'
-VISCA_LEFT = '81 01 06 01 02 02 01 03 FF'
-VISCA_RIGHT = '81 01 06 01 02 02 02 03 FF'
-VISCA_STOP = '81 01 06 01 02 02 03 03 FF'
+VISCA_MOVE_HEADER = '81 01 06 01 '
+VISCA_LEFT = ' 01 03 FF'
+VISCA_RIGHT = ' 02 03 FF'
+VISCA_STOP = ' 03 03 FF'
 visca_socket = None
 
 # Processing Setup
@@ -74,6 +77,30 @@ def reset_sequence_number():
     global sequence_number
     visca_socket.sendto(bytearray.fromhex(VISCA_SEQUENCE_RESET), (VISCA_IP, VISCA_PORT))
     sequence_number = 1
+
+
+def calculate_move_speed(smin, val, smax):
+    speed_ratio = (val - smin) / smax
+    speed = int(((MAX_SPEED - MIN_SPEED) * speed_ratio) + MIN_SPEED)
+    return speed
+
+
+def make_visca_move_command(direction_str, speed):
+    # padded hex value without 0x
+    spd_hex = "{0:0{1}x}".format(int(speed),2)
+    return VISCA_MOVE_HEADER + spd_hex + spd_hex + direction_str
+
+
+def do_visca_move(direction, speed):
+    reset_sequence_number()
+    print("MOVE:", Move(direction), "@ speed", speed, "({0:0{1}x})".format(int(speed),2))
+
+    if direction == Move.LEFT:
+        send_visca_packet(make_visca_move_command(VISCA_LEFT, speed))
+    elif direction == Move.RIGHT:
+        send_visca_packet(make_visca_move_command(VISCA_RIGHT, speed))
+    else:
+        send_visca_packet(make_visca_move_command(VISCA_STOP, speed))
 
 
 def send_visca_packet(command):
@@ -189,10 +216,11 @@ def calculate_edges(frame_shape):
     l_edge = int(frame_shape[1] * BOUNDARY)
     r_edge = frame_shape[1] - l_edge
     height = frame_shape[0]
+    width = frame_shape[1]
 
     bounding = [frame_shape[1], height, 0, 0]
 
-    return l_edge, r_edge, height, bounding
+    return l_edge, r_edge, height, width, bounding
 
 
 def process_datum_keypoints(frame, datum):
@@ -221,8 +249,12 @@ def calculate_boundaries(bounding, regions):
 
 def main_loop():
     bounding = []
+
     direction = Move.STOP
     last_direction = direction
+    speed = 1
+    last_speed = speed
+
     frame_count = 0
 
     while video_capture.isOpened():
@@ -232,7 +264,7 @@ def main_loop():
             time.sleep(0.01)
             continue
 
-        l_edge, r_edge, height, bounding = calculate_edges(frame.shape)
+        l_edge, r_edge, height, width, bounding = calculate_edges(frame.shape)
 
         openpose_datum = op.Datum()
         openpose_datum.cvInputData = frame
@@ -252,25 +284,22 @@ def main_loop():
             cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
 
             if(lrmiddle < l_edge):
+                speed = calculate_move_speed(0, l_edge - lrmiddle, l_edge)
                 direction = Move.LEFT
             elif (lrmiddle > r_edge):
+                speed = calculate_move_speed(r_edge, lrmiddle, width)
                 direction = Move.RIGHT
             else:
+                speed = MIN_SPEED
                 direction = Move.STOP
         else:
             direction = Move.STOP
         
-        if direction != last_direction:
+        if direction != last_direction or speed != last_speed:
             if control_camera:
-                reset_sequence_number()
-                print("MOVE:", Move(direction))
-                if direction == Move.LEFT:
-                    send_visca_packet(VISCA_LEFT)
-                elif direction == Move.RIGHT:
-                    send_visca_packet(VISCA_RIGHT)
-                else:
-                    send_visca_packet(VISCA_STOP)
+                do_visca_move(direction, speed)
             last_direction = direction
+            last_speed = speed
         
         # Showing the output Image
         if SHOW_UI:
