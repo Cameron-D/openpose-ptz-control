@@ -1,5 +1,5 @@
 # https://hub.docker.com/r/cwaffles/openpose
-FROM nvidia/cuda:11.1-cudnn8-devel-ubuntu18.04
+FROM nvidia/cuda:11.2.0-devel-ubuntu18.04
 
 #get deps
 RUN apt-get update && \
@@ -25,7 +25,7 @@ RUN git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose.git .
 RUN cd /openpose/models && bash getModels.sh
 
 RUN mkdir /openpose/build && \
-    cd /openpose/build && cmake -DBUILD_PYTHON=ON ..
+    cd /openpose/build && cmake -DBUILD_PYTHON=ON -DUSE_CUDNN=OFF ..
 
 RUN cd /openpose/build && \
     make -j 12 && \
