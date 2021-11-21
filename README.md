@@ -78,7 +78,7 @@ There are a handful of parameters that can be configured and passed to the conta
 | `NET_RESOLUTION`  | -1x128         | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
 | `SHOW_UI`         | False          | Show the processed video in a window. Requires futher setup (see below). Use `True` or `False`. |
 | `MIN_SPEED`       | 1              | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than MAX_SPEED |
-| `MAX_SPEED        | 16             | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than MIN_SPEED | 
+| `MAX_SPEED`       | 16             | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than MIN_SPEED | 
 
 ## Companion Setup
 
