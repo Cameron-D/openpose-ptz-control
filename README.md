@@ -42,13 +42,13 @@ docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mos
 **Launch the PTZ control container:**
 * Set `VISCA_IP` to the camera's IP/hostname
 * Set `MQTT_HOST` to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
-* Set `CONTROL=1` causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a StreamDeck).  
+* Set `CONTROL=False` causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a StreamDeck).  
 
 ```
 $ docker run --gpus all --name ptztrack --restart unless-stopped -it \
     -e VISCA_IP=10.1.1.174 \
     -e MQTT_HOST=10.1.1.175 \
-    -e CONTROL=1 \
+    -e CONTROL=False \
     --device /dev/video0 ptztrack:11.1
 ```
 
@@ -77,8 +77,8 @@ There are a handful of parameters that can be configured and passed to the conta
 | `BOUNDARY `       | 0.35           | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side). 0 - 0.5 accepted. |
 | `NET_RESOLUTION`  | -1x128         | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
 | `SHOW_UI`         | False          | Show the processed video in a window. Requires futher setup (see below). Use `True` or `False`. |
-| `MIN_SPEED`       | 1              | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than MAX_SPEED |
-| `MAX_SPEED`       | 16             | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than MIN_SPEED | 
+| `MIN_SPEED`       | 1              | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than `MAX_SPEED` |
+| `MAX_SPEED`       | 16             | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than `MIN_SPEED` | 
 
 ## Companion Setup
 
