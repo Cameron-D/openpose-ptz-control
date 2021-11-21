@@ -2,56 +2,55 @@ import cv2, socket, time, socket, select, os
 import numpy as np
 import pyopenpose as op
 import paho.mqtt.client as mqtt
-from enum import Enum
+import time
+from enum import IntEnum
 from itertools import product
 from signal import signal, SIGINT
 from sys import exit
 
-class Move(Enum):
+class Move(IntEnum):
     STOP = 0
     LEFT = 1
     RIGHT = 2
 
+class Edge(IntEnum):
+    LEFT = 0
+    TOP = 1
+    RIGHT = 2
+    BOTTOM = 3
+
 VISCA_IP = os.getenv('VISCA_IP', "192.168.1.134")
-VISCA_PORT = int(os.getenv('VISCA_IP', 52381))
+VISCA_PORT = int(os.getenv('VISCA_PORT', 52381))
 
 MQTT_HOST = os.getenv('MQTT_HOST', "10.1.1.175")
 
-SHOW_UI = os.getenv('SHOW_UI', False)
-CONTROL = os.getenv('CONTROL', False)
+SHOW_UI = bool(os.getenv('SHOW_UI', False))
+CONTROL = bool(os.getenv('CONTROL', False))
 
 BOUNDARY = float(os.getenv('BOUNDARY', .35))
 
 NET_RESOLUTION = os.getenv('NET_RESOLUTION', "-1x128")
 
-VISCA_SEQUENCE = '02 00 00 01 00 00 00 01 01'
-VISCA_LEFT = '81 01 06 01 02 02 01 03 FF'
-VISCA_RIGHT = '81 01 06 01 02 02 02 03 FF'
-VISCA_STOP = '81 01 06 01 02 02 03 03 FF'
-
 direction = Move.STOP
-last_direction = direction
 
 control_camera = True if CONTROL else False
 
 # VISCA Setep
 sequence_number = 1
-visca_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+VISCA_SEQUENCE_RESET = '02 00 00 01 00 00 00 01 01'
+VISCA_LEFT = '81 01 06 01 02 02 01 03 FF'
+VISCA_RIGHT = '81 01 06 01 02 02 02 03 FF'
+VISCA_STOP = '81 01 06 01 02 02 03 03 FF'
+visca_socket = None
 
 # Processing Setup
-bounding = [0, 0, 0, 0]
 regions = []
-process_this_frame = True
-video_capture = cv2.VideoCapture(0)
+video_capture = None
+frame_count = 0
 
-# OpenPose Setep
-params = dict()
-params["model_folder"] = "/openpose/models"
-params["net_resolution"] = NET_RESOLUTION
+openpose_wrapper = None
+mqttc = None
 
-opWrapper = op.WrapperPython()
-opWrapper.configure(params)
-opWrapper.start()
 
 def mqtt_message(client, userdata, message):
     global control_camera
@@ -71,20 +70,13 @@ def mqtt_message(client, userdata, message):
     elif data.startswith("control toggle"):
         control_camera = not control_camera
         mqttc.publish("PTZ_STATE", move_state())
-    
-
-mqttc = mqtt.Client("PTZTrack")
-mqttc.connect(MQTT_HOST)
-frame_count = 0
-mqttc.loop_start()
-mqttc.subscribe("PTZ_SETSTATE")
-mqttc.on_message=mqtt_message
 
 
 def reset_sequence_number():
     global sequence_number
-    visca_socket.sendto(bytearray.fromhex(VISCA_SEQUENCE), (VISCA_IP, VISCA_PORT))
+    visca_socket.sendto(bytearray.fromhex(VISCA_SEQUENCE_RESET), (VISCA_IP, VISCA_PORT))
     sequence_number = 1
+
 
 def send_visca_packet(command):
     global sequence_number
@@ -95,18 +87,18 @@ def send_visca_packet(command):
     sequence_number += 1
     visca_socket.sendto(message, (VISCA_IP, VISCA_PORT))
 
+
 def move_state():
     return "on" if control_camera else "off"
 
-mqttc.publish("PTZ_STATE", move_state())
 
-def getKeypointsRectangle(keypoints, threshold=0.2):
+def get_keypoints_rectangle(keypoints, threshold=0.2):
     numberKeypoints = keypoints.shape[0]
     if numberKeypoints < 1:
         return "Number body parts must be > 0."
     
-    minX =  minY = float('inf')
-    maxX =  maxY = float('-inf')
+    minX = minY = float('inf')
+    maxX = maxY = float('-inf')
     
     for keypoint in keypoints:
         score = keypoint[2]
@@ -130,6 +122,7 @@ def getKeypointsRectangle(keypoints, threshold=0.2):
 
 def sigint_handler(signal_received, frame):
     global control_camera
+
     print('Program exit requested... Exiting gracefully')
     control_camera = False
     mqttc.publish("PTZ_STATE", move_state())
@@ -138,67 +131,128 @@ def sigint_handler(signal_received, frame):
     video_capture.release() 
     cv2.destroyAllWindows()
     exit(0)
-signal(SIGINT, sigint_handler)
 
 
-while video_capture.isOpened():
-    # Grab a single frame of video
+def do_setup():
+    global visca_socket, openpose_wrapper, mqttc, video_capture
+
+    visca_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    # OpenPose Setep
+    params = dict()
+    params["model_folder"] = "/openpose/models"
+    params["net_resolution"] = NET_RESOLUTION
+
+    openpose_wrapper = op.WrapperPython()
+    openpose_wrapper.configure(params)
+    openpose_wrapper.start()
+
+    video_capture = cv2.VideoCapture(0)
+
+    #MQTT Setup
+    mqttc = mqtt.Client("PTZTrack")
+    mqttc.connect(MQTT_HOST)
+    mqttc.loop_start()
+    mqttc.subscribe("PTZ_SETSTATE")
+    mqttc.on_message=mqtt_message
+    mqttc.publish("PTZ_STATE", move_state())
+
+    signal(SIGINT, sigint_handler)
+
+
+def read_frame():
     ret, frame = video_capture.read()
-    
     frame = cv2.resize(frame, (1280, 720))
+    return ret, frame
 
-    if ret:
-        l_edge = int(frame.shape[1] * BOUNDARY)
-        r_edge = frame.shape[1] - l_edge
-        height = frame.shape[0]
 
-        bounding[0] = frame.shape[1]
-        bounding[1] = frame.shape[0]
-        bounding[2] = 0
-        bounding[3] = 0
 
-        if process_this_frame and control_camera:
-            regions = []
+def update_frame_count(fc):
+    fc =+ 1
+    
+    if fc == 50:
+        mqttc.publish("PTZ_STATE", move_state())
+        fc = 0
 
-            datum = op.Datum()
-            datum.cvInputData = frame
-            opWrapper.emplaceAndPop(op.VectorDatum([datum]))
-            
-            frame = datum.cvOutputData
-                        
-            for i in range(0, datum.poseKeypoints.shape[0]):
-                p = getKeypointsRectangle(datum.poseKeypoints[i], 0.1)
-                regions.append([p[0], p[1], p[2]-p[0], p[3]-p[1]])
-                #cv2.rectangle(frame, (p[0], p[1]), (p[2], p[3]), (0, 255, 0), 2)
+    return fc
 
-        #process_this_frame = not process_this_frame
 
-        # Drawing the regions in the
-        # Image
-        for (x, y, w, h) in regions:
-            if x < bounding[0]:
-                bounding[0] = x
-            if y < bounding[1]:
-                bounding[1] = y
-            if x+w > bounding[2]:
-                bounding[2] = x+w
-            if y+h > bounding[3]:
-                bounding[3] = y+h
-        
+def show_ui(frame):
+    if (frame.shape[0] != 720) and (frame.shape[1] != 1280):
+        frame = cv2.resize(frame, (1280, 720))
 
-        bx1 = int(bounding[0])
-        by1 = int(bounding[1])
-        bx2 = int(bounding[2])
-        by2 = int(bounding[3])
-        cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 200, 0), 2)
+    cv2.imshow("PTZTrack Frame", frame)
 
-        lrmiddle = int(((bounding[2] - bounding[0]) / 2) + bounding[0])
-        udmiddle = int(((bounding[3] - bounding[1]) / 2) + bounding[1])
-        
+    if cv2.waitKey(25) & 0xFF == ord('q'):
+        return True
+
+
+def calculate_edges(frame_shape):
+    l_edge = int(frame_shape[1] * BOUNDARY)
+    r_edge = frame_shape[1] - l_edge
+    height = frame_shape[0]
+
+    bounding = [frame_shape[1], height, 0, 0]
+
+    return l_edge, r_edge, height, bounding
+
+
+def process_datum_keypoints(frame, datum):
+    regions = []
+
+    for i in range(0, datum.poseKeypoints.shape[0]):
+        p = get_keypoints_rectangle(datum.poseKeypoints[i], 0.1)
+        regions.append([p[0], p[1], p[2]-p[0], p[3]-p[1]])
+        cv2.rectangle(frame, (p[0], p[1]), (p[2], p[3]), (0, 255, 255), 2)
+    
+    return frame, regions
+
+
+def calculate_boundaries(bounding, regions):
+    for (x, y, w, h) in regions:
+        if x < bounding[Edge.LEFT]:
+            bounding[Edge.LEFT] = x
+        if y < bounding[Edge.TOP]:
+            bounding[Edge.TOP] = y
+        if x+w > bounding[Edge.RIGHT]:
+            bounding[Edge.RIGHT] = x+w
+        if y+h > bounding[Edge.BOTTOM]:
+            bounding[Edge.BOTTOM] = y+h
+    
+    return bounding
+
+def main_loop():
+    global direction
+
+    bounding = []
+    last_direction = direction
+    frame_count = 0
+
+    while video_capture.isOpened():
+        check, frame = read_frame()
+
+        if not check:
+            time.sleep(0.01)
+            continue
+
+        l_edge, r_edge, height, bounding = calculate_edges(frame.shape)
+
+        openpose_datum = op.Datum()
+        openpose_datum.cvInputData = frame
+        openpose_wrapper.emplaceAndPop(op.VectorDatum([openpose_datum]))
+        frame = openpose_datum.cvOutputData
+
+        frame, regions = process_datum_keypoints(frame, openpose_datum)
+
+        bounding = calculate_boundaries(bounding, regions)
+
+        lrmiddle = int(((bounding[Edge.RIGHT] - bounding[Edge.LEFT]) / 2) + bounding[Edge.LEFT])
+        udmiddle = int(((bounding[Edge.BOTTOM] - bounding[Edge.TOP]) / 2) + bounding[Edge.TOP])
+
+        cv2.rectangle(frame, (bounding[Edge.LEFT], bounding[Edge.TOP]), (bounding[Edge.RIGHT], bounding[Edge.BOTTOM]), (0, 200, 0), 2)
         cv2.rectangle(frame, (lrmiddle-1, udmiddle-1), (lrmiddle+1, udmiddle+1), (255, 255, 0), 4)
-
         cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
-        
+
         if(lrmiddle < l_edge):
             direction = Move.LEFT
         elif (lrmiddle > r_edge):
@@ -217,20 +271,16 @@ while video_capture.isOpened():
                 else:
                     send_visca_packet(VISCA_STOP)
             last_direction = direction
-   
+        
         # Showing the output Image
         if SHOW_UI:
-            frame = cv2.resize(frame, (1280, 720))
-            cv2.imshow("Frame", frame)
-            if cv2.waitKey(25) & 0xFF == ord('q'):
+            if show_ui(frame):
                 break
 
-        frame_count =+ 1
-        if frame_count == 50:
-            mqttc.publish("PTZ_STATE", move_state())
-            frame_count = 0
-        
-    else:
-        break
+        frame_count = update_frame_count(frame_count)
 
-sigint_handler(None, None) #force tidy exit
+
+if __name__ == "__main__":
+    do_setup()
+    main_loop()
+    sigint_handler(None, None) #force tidy exit
