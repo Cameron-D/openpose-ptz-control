@@ -2,7 +2,7 @@
 
 Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to identify people in an video feed (currently only via webcamera) and issue VISCA over IP PTZ commands to a networked camera. MQTT is used to issue commands to turn the control on/off.
 
-Currently tested and used with a BirdDog P200 using `ffmpeg` with NDI support to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake.
+Currently tested and used with a BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake.
 
 It only tracks the first person it finds, and only moves left/right.
 
