@@ -22,16 +22,19 @@ class Edge(IntEnum):
 VISCA_IP = os.getenv('VISCA_IP', "192.168.1.134")
 VISCA_PORT = int(os.getenv('VISCA_PORT', 52381))
 
+MQTT_ENABLED = bool(int(os.getenv('MQTT_ENABLED', True)))
 MQTT_HOST = os.getenv('MQTT_HOST', "10.1.1.175")
 
-SHOW_UI = bool(os.getenv('SHOW_UI', False))
-CONTROL = bool(os.getenv('CONTROL', False))
+SHOW_UI = bool(int(os.getenv('SHOW_UI', False)))
+CONTROL = bool(int(os.getenv('CONTROL', False)))
 
 BOUNDARY = float(os.getenv('BOUNDARY', .35))
 MIN_SPEED = int(os.getenv('MIN_SPEED', 1))
 MAX_SPEED = int(os.getenv('MAX_SPEED', 12))
 
 NET_RESOLUTION = os.getenv('NET_RESOLUTION', "-1x128")
+
+VIDEO_DEVICE = int(os.getenv('VIDEO_DEVICE', 0))
 
 control_camera = True if CONTROL else False
 
@@ -45,9 +48,7 @@ VISCA_STOP = ' 03 03 FF'
 visca_socket = None
 
 # Processing Setup
-regions = []
 video_capture = None
-frame_count = 0
 
 openpose_wrapper = None
 mqttc = None
@@ -150,9 +151,10 @@ def sigint_handler(signal_received, frame):
 
     print('Program exit requested... Exiting gracefully')
     control_camera = False
-    mqttc.publish("PTZ_STATE", move_state())
-    time.sleep(0.1)
-    mqttc.loop_stop()
+    if MQTT_ENABLED:
+        mqttc.publish("PTZ_STATE", move_state())
+        time.sleep(0.1)
+        mqttc.loop_stop()
     video_capture.release() 
     cv2.destroyAllWindows()
     exit(0)
@@ -172,15 +174,19 @@ def do_setup():
     openpose_wrapper.configure(params)
     openpose_wrapper.start()
 
-    video_capture = cv2.VideoCapture(0)
+    video_capture = cv2.VideoCapture(VIDEO_DEVICE)
 
     #MQTT Setup
-    mqttc = mqtt.Client("PTZTrack")
-    mqttc.connect(MQTT_HOST)
-    mqttc.loop_start()
-    mqttc.subscribe("PTZ_SETSTATE")
-    mqttc.on_message=mqtt_message
-    mqttc.publish("PTZ_STATE", move_state())
+    if MQTT_ENABLED:
+        mqttc = mqtt.Client("PTZTrack")
+        mqttc.connect(MQTT_HOST)
+        mqttc.loop_start()
+        mqttc.subscribe("PTZ_SETSTATE")
+        mqttc.on_message=mqtt_message
+        mqttc.publish("PTZ_STATE", move_state())
+        print("MQTT Connected")
+    else:
+        print("Skipping MQTT Connection")
 
     signal(SIGINT, sigint_handler)
 
@@ -306,7 +312,8 @@ def main_loop():
             if show_ui(frame):
                 break
 
-        frame_count = update_frame_count(frame_count)
+        if MQTT_ENABLED:
+            frame_count = update_frame_count(frame_count)
 
 
 if __name__ == "__main__":
