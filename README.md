@@ -4,7 +4,7 @@ Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to ide
 
 Currently tested and used with a BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake.
 
-It only tracks the first person it finds, and only moves left/right.
+It tracks the middle of all people it finds, so might not do anything if there are several people visible.
 
 This is the third iteration of this program, after trying various face/people tracking options.
 
@@ -43,7 +43,7 @@ By default an MQTT broker is required, you can set the `MQTT_ENABLED=0` env var 
 docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mosquitto 
 ```
 
-## PTZ Controller
+### PTZ Controller
 
 * Set `VISCA_IP` to the camera's IP/hostname
 * Set `MQTT_HOST` to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
@@ -66,7 +66,6 @@ If all goes well it should start up with no errors, print out in the console whe
 * Read direct NDI frames rather than relying on a custom build of ffmpeg and v4l2loopback
 * Track a persons head rather than the full body bounding box
 * An alternative library for people detection (i.e. tf-pose-estimation seems to be faster?)
-
 
 ## Configuration Options
 
