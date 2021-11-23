@@ -25,6 +25,8 @@ $ docker build -t ptzcontrol:11.1 .
 
 ## Running
 
+### Video Feed
+
 Running it assumes the webcam/video feed is available at `/dev/video0`...
 
 If you have ffmpeg with NDI support, the following will work to expose it as a video device (limiting to 10 FPS to reduce processing later):
@@ -33,35 +35,37 @@ sudo modprobe v4l2loopback
 ffmpeg -f libndi_newtek -extra_ips "10.1.1.174" -i "BIRDDOG-ABC123 (CAM)" -vf "fps=fps=10" -pix_fmt yuv420p -f v4l2 /dev/video0
 ```
 
+### MQTT
+
 By default an MQTT broker is required, you can set the `MQTT_ENABLED=0` env var to disable this requirement. In this case, setting `CONTROL=1` will also be required for the program to do anything.
 
 ```
 docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mosquitto 
 ```
 
-**Launch the PTZ control container:**
+## PTZ Controller
+
 * Set `VISCA_IP` to the camera's IP/hostname
 * Set `MQTT_HOST` to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
-* Set `CONTROL=0` causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a StreamDeck).  
+* Set `CONTROL=1` causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a StreamDeck).  
 
 ```
 $ docker run --gpus all --name ptztrack --restart unless-stopped -it \
     -e VISCA_IP=10.1.1.174 \
     -e MQTT_HOST=10.1.1.175 \
-    -e CONTROL=0 \
+    -e CONTROL=1 \
     --device /dev/video0 ptztrack:11.1
 ```
 
 If all goes well it should start up with no errors, print out in the console when it's moving, and actually move the camera.
 
-## WIshlist of things I might add one day
+## Wishlist of things I might add one day
 
 * ✅ Smooth acceleration for panning (start slow, accelerate if the person nears the edges of the frame)
 * Support for multiple people in view, but following only one
 * Read direct NDI frames rather than relying on a custom build of ffmpeg and v4l2loopback
 * Track a persons head rather than the full body bounding box
 * An alternative library for people detection (i.e. tf-pose-estimation seems to be faster?)
-* ~~Support for multiple people in view, and zooming to keep them all in frame...~~
 
 
 ## Configuration Options
@@ -70,17 +74,17 @@ There are a handful of parameters that can be configured and passed to the conta
 
 | Option            | Default          | Description |
 | ----------------- | ---------------- | ----------- |
-| `VISCA_IP` (Required) | `192.168.1.134` | IP address of the PTZ camera. IP or hostname accepted. |
+| `VISCA_IP`        | `192.168.1.134` | IP address of the PTZ camera. IP or hostname accepted. |
 | `VISCA_PORT `     | `52381`          | Port that camera accepts VISCA commands on. |
 | `MQTT_ENABLED`    | `1`              | Whether or not to enable to MQTT funtionality. Can be `1` or `0`. |
-| `MQTT_HOST` (Required) | `10.1.1.175` | IP address of MQTT broker. IP or hostname accepted. |
-| `CONTROL  `       | `0`              | Whether to start controlling the camera automatically or wait for a start command. Use `1` or `0`. |
+| `MQTT_HOST`       | `10.1.1.175` | IP address of MQTT broker. IP or hostname accepted. |
+| `CONTROL  `       | `0`              | Whether to start controlling the camera automatically or wait for a start command. Can be `1` or `0`. |
 | `BOUNDARY `       | `0.35`           | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side). 0 - 0.5 accepted. |
 | `MIN_SPEED`       | `1`              | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than `MAX_SPEED` |
 | `MAX_SPEED`       | `16`             | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than `MIN_SPEED` | 
 | `NET_RESOLUTION`  | `-1x128`         | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
 | `VIDEO_DEVICE`    | `0`              | Which video device to use. Defaults to 0 (/dev/video0) |
-| `SHOW_UI`         | `0`              | Show the processed video in a window. Requires futher setup (see below). Use `1` or `0`. |
+| `SHOW_UI`         | `0`              | Show the processed video in a window. Requires futher setup (see below). Can be `1` or `0`. |
 
 
 ## Companion Setup
@@ -134,6 +138,6 @@ $ docker run --gpus all --name ptztrack \
     --device /dev/video0 ptztrack:11.1
 ```
 
-After a moment a window should pop up with blue lines representing the movement edges, people marked in colours, a green box around the people and a blue point in the middle. If the blue point is outside the edges the camera will move in the required direction. Press Q to exit.
+After a moment a window should pop up with dark blue lines representing the movement boundaries, people marked in colours, a green box around the people and a light blue point in the middle. If the blue point is outside the dark blue lines the camera will move in the required direction. Press Q to exit.
 
 ![Live preview screenshot](https://raw.githubusercontent.com/Cameron-D/openpose-ptz-control/main/Preview.png)
