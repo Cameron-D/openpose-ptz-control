@@ -23,22 +23,20 @@ class Edge(IntEnum):
     BOTTOM = 3
 
 
+class Visca:
+    SEQUENCE_RESET = "02 00 00 01 00 00 00 01 01"
+    MOVE_HEADER = "81 01 06 01 "
+    LEFT = " 01 03 FF"
+    RIGHT = " 02 03 FF"
+    STOP = " 03 03 FF"
+
+
 control_camera = None
-
-# VISCA Setup
 sequence_number = 1
-VISCA_SEQUENCE_RESET = "02 00 00 01 00 00 00 01 01"
-VISCA_MOVE_HEADER = "81 01 06 01 "
-VISCA_LEFT = " 01 03 FF"
-VISCA_RIGHT = " 02 03 FF"
-VISCA_STOP = " 03 03 FF"
 visca_socket = None
-
-# Processing Setup
 video_capture = None
 openpose_wrapper = None
 mqttc = None
-
 args = None
 
 
@@ -65,7 +63,7 @@ def mqtt_message(client, userdata, message):
 def reset_sequence_number():
     global sequence_number
     visca_socket.sendto(
-        bytearray.fromhex(VISCA_SEQUENCE_RESET), (args.visca_ip, args.visca_port)
+        bytearray.fromhex(Visca.SEQUENCE_RESET), (args.visca_ip, args.visca_port)
     )
     sequence_number = 1
 
@@ -79,7 +77,7 @@ def calculate_move_speed(smin, val, smax):
 def make_visca_move_command(direction_str, speed):
     # padded hex value without 0x
     spd_hex = "{0:0{1}x}".format(int(speed), 2)
-    return VISCA_MOVE_HEADER + spd_hex + spd_hex + direction_str
+    return Visca.MOVE_HEADER + spd_hex + spd_hex + direction_str
 
 
 def do_visca_move(direction, speed):
@@ -89,11 +87,11 @@ def do_visca_move(direction, speed):
     )
 
     if direction == Move.LEFT:
-        send_visca_packet(make_visca_move_command(VISCA_LEFT, speed))
+        send_visca_packet(make_visca_move_command(Visca.LEFT, speed))
     elif direction == Move.RIGHT:
-        send_visca_packet(make_visca_move_command(VISCA_RIGHT, speed))
+        send_visca_packet(make_visca_move_command(Visca.RIGHT, speed))
     else:
-        send_visca_packet(make_visca_move_command(VISCA_STOP, speed))
+        send_visca_packet(make_visca_move_command(Visca.STOP, speed))
 
 
 def send_visca_packet(command):
