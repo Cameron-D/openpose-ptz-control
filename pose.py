@@ -1,13 +1,9 @@
-import cv2, socket, time, socket, select, os
-import numpy as np
+import cv2, socket, time, socket, argparse, time
 import pyopenpose as op
 import paho.mqtt.client as mqtt
-import time
 from enum import IntEnum
-from itertools import product
 from signal import signal, SIGINT
 from sys import exit
-import argparse
 
 
 class Move(IntEnum):
