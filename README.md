@@ -19,7 +19,7 @@ $ tar xvf openpose-ptz-control.tar.gz
 * Build the docker container
 ```
 $ cd openpose-ptz-control
-$ docker build -t ptzcontrol:11.1 .
+$ docker build -t ptzcontrol:11.2 .
 ```
 * Wait a while for it to download and build... ☕
 
@@ -45,16 +45,13 @@ docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mos
 
 ### PTZ Controller
 
-* Set `VISCA_IP` to the camera's IP/hostname
-* Set `MQTT_HOST` to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
-* Set `CONTROL=1` causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a StreamDeck).  
+* Set `--mqtt_host` to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
+* Providing `--control` causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a MQTT/StreamDeck).  
+* Last argument is the camera's IP/hostname
 
 ```
 $ docker run --gpus all --name ptztrack --restart unless-stopped -it \
-    -e VISCA_IP=10.1.1.174 \
-    -e MQTT_HOST=10.1.1.175 \
-    -e CONTROL=1 \
-    --device /dev/video0 ptztrack:11.1
+    --device /dev/video0 ptztrack:11.1 --control --mqtt_host 10.1.1.175 10.1.1.174
 ```
 
 If all goes well it should start up with no errors, print out in the console when it's moving, and actually move the camera.
@@ -69,21 +66,21 @@ If all goes well it should start up with no errors, print out in the console whe
 
 ## Configuration Options
 
-There are a handful of parameters that can be configured and passed to the container on launch via environment variables (through `-e`).
+There are a handful of options that can be configured and passed to the container as launch parameters. The only required parameter is the camera's IP.
 
-| Option            | Default          | Description |
-| ----------------- | ---------------- | ----------- |
-| `VISCA_IP`        | `192.168.1.134` | IP address of the PTZ camera. IP or hostname accepted. |
-| `VISCA_PORT `     | `52381`          | Port that camera accepts VISCA commands on. |
-| `MQTT_ENABLED`    | `1`              | Whether or not to enable to MQTT funtionality. Can be `1` or `0`. |
-| `MQTT_HOST`       | `10.1.1.175` | IP address of MQTT broker. IP or hostname accepted. |
-| `CONTROL  `       | `0`              | Whether to start controlling the camera automatically or wait for a start command. Can be `1` or `0`. |
-| `BOUNDARY `       | `0.35`           | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side). 0 - 0.5 accepted. |
-| `MIN_SPEED`       | `1`              | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than `MAX_SPEED` |
-| `MAX_SPEED`       | `16`             | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than `MIN_SPEED` | 
-| `NET_RESOLUTION`  | `-1x128`         | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
-| `VIDEO_DEVICE`    | `0`              | Which video device to use. Defaults to 0 (/dev/video0) |
-| `SHOW_UI`         | `0`              | Show the processed video in a window. Requires futher setup (see below). Can be `1` or `0`. |
+| Option                | Default     | Description |
+| --------------------- | ----------- | ----------- |
+| Camera IP             | None        | IP address of the PTZ camera. IP or hostname accepted. Provided as a direct parameter. |
+| `-p `/`--visca_port`  | `52381`     | Port that camera accepts VISCA commands on. |
+| `-m`/`--mqtt`         | `False`     | Whether or not to enable to MQTT funtionality. True or False. |
+| `--mqtt_host`         | `127.0.0.1` | IP address of MQTT broker. IP or hostname accepted. |
+| `-c`/`--control`      | `False`     | Whether to start controlling the camera automatically or wait for a start command. Can be True or False. |
+| `-b`/`--boundary `    | `0.35`      | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side). 0 - 0.5 accepted. |
+| `-s`/`--speed_min`    | `1`         | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than `MAX_SPEED` |
+| `-S`/`--speed_max`    | `16`        | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than `MIN_SPEED` | 
+| `--net_resolution`    | `-1x128`    | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
+| `-v`/`--video_device` | `0`         | Which video device to use. Defaults to 0 (/dev/video0) |
+| `--ui`                | `0`         | Show the processed video in a window. Requires futher setup (see below). Can be `1` or `0`. |
 
 
 ## Companion Setup
@@ -130,11 +127,7 @@ $ docker run --gpus all --name ptztrack \
     --net=host --ipc=host \
     -e DISPLAY=$DISPLAY \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
-    -e VISCA_IP=10.1.1.174 \
-    -e MQTT_HOST=10.1.1.175 \
-    -e CONTROL=1 \
-    -e SHOW_UI=1 \
-    --device /dev/video0 ptztrack:11.1
+    --device /dev/video0 ptztrack:11.1 -m --mqtt_host 10.1.1.175 -c --ui 10.1.1.174
 ```
 
 After a moment a window should pop up with dark blue lines representing the movement boundaries, people marked in colours, a green box around the people and a light blue point in the middle. If the blue point is outside the dark blue lines the camera will move in the required direction. Press Q to exit.

@@ -7,6 +7,7 @@ from enum import IntEnum
 from itertools import product
 from signal import signal, SIGINT
 from sys import exit
+import argparse
 
 
 class Move(IntEnum):
@@ -22,26 +23,11 @@ class Edge(IntEnum):
     BOTTOM = 3
 
 
-VISCA_IP = os.getenv("VISCA_IP", "192.168.1.134")
-VISCA_PORT = int(os.getenv("VISCA_PORT", 52381))
-
-MQTT_ENABLED = bool(int(os.getenv("MQTT_ENABLED", True)))
-MQTT_HOST = os.getenv("MQTT_HOST", "10.1.1.175")
-
-SHOW_UI = bool(int(os.getenv("SHOW_UI", False)))
-CONTROL = bool(int(os.getenv("CONTROL", False)))
-
-BOUNDARY = float(os.getenv("BOUNDARY", 0.35))
-MIN_SPEED = int(os.getenv("MIN_SPEED", 1))
-MAX_SPEED = int(os.getenv("MAX_SPEED", 12))
-
-NET_RESOLUTION = os.getenv("NET_RESOLUTION", "-1x128")
-
 VIDEO_DEVICE = int(os.getenv("VIDEO_DEVICE", 0))
 
-control_camera = True if CONTROL else False
+control_camera = None
 
-# VISCA Setep
+# VISCA Setup
 sequence_number = 1
 VISCA_SEQUENCE_RESET = "02 00 00 01 00 00 00 01 01"
 VISCA_MOVE_HEADER = "81 01 06 01 "
@@ -52,9 +38,10 @@ visca_socket = None
 
 # Processing Setup
 video_capture = None
-
 openpose_wrapper = None
 mqttc = None
+
+args = None
 
 
 def mqtt_message(client, userdata, message):
@@ -79,13 +66,15 @@ def mqtt_message(client, userdata, message):
 
 def reset_sequence_number():
     global sequence_number
-    visca_socket.sendto(bytearray.fromhex(VISCA_SEQUENCE_RESET), (VISCA_IP, VISCA_PORT))
+    visca_socket.sendto(
+        bytearray.fromhex(VISCA_SEQUENCE_RESET), (args.visca_ip, args.visca_port)
+    )
     sequence_number = 1
 
 
 def calculate_move_speed(smin, val, smax):
     speed_ratio = (val - smin) / smax
-    speed = int(((MAX_SPEED - MIN_SPEED) * speed_ratio) + MIN_SPEED)
+    speed = int(((args.speed_max - args.speed_min) * speed_ratio) + args.speed_min)
     return speed
 
 
@@ -118,7 +107,7 @@ def send_visca_packet(command):
         payload_type + payload_length + sequence_number.to_bytes(4, "big") + payload
     )
     sequence_number += 1
-    visca_socket.sendto(message, (VISCA_IP, VISCA_PORT))
+    visca_socket.sendto(message, (args.visca_ip, args.visca_port))
 
 
 def move_state():
@@ -158,7 +147,7 @@ def sigint_handler(signal_received, frame):
 
     print("Program exit requested... Exiting gracefully")
     control_camera = False
-    if MQTT_ENABLED:
+    if args.mqtt:
         mqttc.publish("PTZ_STATE", move_state())
         time.sleep(0.1)
         mqttc.loop_stop()
@@ -175,7 +164,7 @@ def do_setup():
     # OpenPose Setep
     params = dict()
     params["model_folder"] = "/openpose/models"
-    params["net_resolution"] = NET_RESOLUTION
+    params["net_resolution"] = args.net_resolution
 
     openpose_wrapper = op.WrapperPython()
     openpose_wrapper.configure(params)
@@ -184,9 +173,9 @@ def do_setup():
     video_capture = cv2.VideoCapture(VIDEO_DEVICE)
 
     # MQTT Setup
-    if MQTT_ENABLED:
+    if args.mqtt:
         mqttc = mqtt.Client("PTZTrack")
-        mqttc.connect(MQTT_HOST)
+        mqttc.connect(args.mqtt_host)
         mqttc.loop_start()
         mqttc.subscribe("PTZ_SETSTATE")
         mqttc.on_message = mqtt_message
@@ -225,7 +214,7 @@ def show_ui(frame):
 
 
 def calculate_edges(frame_shape):
-    l_edge = int(frame_shape[1] * BOUNDARY)
+    l_edge = int(frame_shape[1] * args.boundary)
     r_edge = frame_shape[1] - l_edge
     height = frame_shape[0]
     width = frame_shape[1]
@@ -319,7 +308,7 @@ def main_loop():
                 speed = calculate_move_speed(r_edge, lrmiddle, width)
                 direction = Move.RIGHT
             else:
-                speed = MIN_SPEED
+                speed = args.speed_min
                 direction = Move.STOP
         else:
             direction = Move.STOP
@@ -331,15 +320,90 @@ def main_loop():
             last_speed = speed
 
         # Showing the output Image
-        if SHOW_UI:
+        if args.ui:
             if show_ui(frame):
                 break
 
-        if MQTT_ENABLED:
+        if args.mqtt:
             frame_count = update_frame_count(frame_count)
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Automatic control of a PTZ camera using image recognition"
+    )
+    parser.add_argument(
+        "visca_ip",
+        help="IP address of the VISCA interface for the camera to be controlled. Required.",
+    )
+    parser.add_argument(
+        "-p",
+        "--visca_port",
+        default=52381,
+        help="Port number of the VISCA interface for the camera to be controlled (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-m",
+        "--mqtt",
+        action="store_true",
+        help="Enable remote control over MQTT (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--mqtt_host",
+        default="127.0.0.1",
+        help="Hostname or IP of the MQTT Broker (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-c",
+        "--control",
+        action="store_true",
+        help="If provided and MQTT is enabled, will start controlling the camera on launch, otherwise program will wait for a control command over MQTT. (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-b",
+        "--boundary",
+        default=0.35,
+        type=float,
+        help="Width of the target box to keep the tracked person inside, as a percentage of screen width (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-s",
+        "--speed_min",
+        default=1,
+        type=int,
+        help="Minimum speed to move the camera at. Not more than speed_max, min 1. (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-S",
+        "--speed_max",
+        default=12,
+        type=int,
+        help="Maximum speed to move the camera at. Not less than speed_min, max 24. (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--net_resolution",
+        default="-1x128",
+        help="Argument for net_resolution passed directly to OpenCV (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-v",
+        "--video_device",
+        default=0,
+        type=int,
+        help="Video device number to read frames from (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="If provided, display a UI interface visualising the processing (default: %(default)s)",
+    )
+    args = parser.parse_args()
+
+    if args.mqtt:
+        control_camera = args.control
+    else:
+        control_camera = True
+
     do_setup()
     main_loop()
     sigint_handler(None, None)  # force tidy exit
