@@ -1,12 +1,12 @@
 # Openpose PTZ control
 
-Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to identify people in an video feed (currently only via webcamera) and issue VISCA over IP PTZ commands to a networked camera. MQTT is used to issue commands to turn the control on/off.
+Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to identify people in an video feed (currently only via v4l2 device) and issue VISCA over IP PTZ commands to a networked camera. MQTT is used to issue commands to turn the control on/off.
 
 Currently tested and used with a BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake.
 
-It tracks the middle of all people it finds, so might not do anything if there are several people visible.
+It tracks the middle of all people it finds, so it probably won't do much if there are several people visible.
 
-This is the third iteration of this program, after trying various face/people tracking options.
+This is the third major iteration of this program, after trying various face/people tracking options.
 
 ## Setup
 
@@ -37,7 +37,7 @@ ffmpeg -f libndi_newtek -extra_ips "10.1.1.174" -i "BIRDDOG-ABC123 (CAM)" -vf "f
 
 ### MQTT
 
-By default an MQTT broker is required, you can set the `MQTT_ENABLED=0` env var to disable this requirement. In this case, setting `CONTROL=1` will also be required for the program to do anything.
+By default the program will automaticall start controlling the camera when launched. If you enable MQTT support and provide an MQTT host (`--mqtt --mqtt_host 10.1.1.175`) commands can be provided to the program through an MQTT broker. It is easiest to use Docker to run a broker:
 
 ```
 docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mosquitto 
@@ -46,7 +46,7 @@ docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mos
 ### PTZ Controller
 
 * Set `--mqtt_host` to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
-* Providing `--control` causes it to automatically start controlling the camera. Remove this line if you would like control to default to OFF (and to turn on/toggle later via a MQTT/StreamDeck).  
+* Providing `--control` causes it to automatically start controlling the camera. Remove this option if you would like control to default to OFF (and to turn on/toggle later via a MQTT/StreamDeck).  
 * Last argument is the camera's IP/hostname
 
 ```
@@ -127,7 +127,8 @@ $ docker run --gpus all --name ptztrack \
     --net=host --ipc=host \
     -e DISPLAY=$DISPLAY \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
-    --device /dev/video0 ptztrack:11.1 -m --mqtt_host 10.1.1.175 -c --ui 10.1.1.174
+    --device /dev/video0 ptztrack:11.1 \ 
+    -m --mqtt_host 10.1.1.175 -c --ui 10.1.1.174
 ```
 
 After a moment a window should pop up with dark blue lines representing the movement boundaries, people marked in colours, a green box around the people and a light blue point in the middle. If the blue point is outside the dark blue lines the camera will move in the required direction. Press Q to exit.
