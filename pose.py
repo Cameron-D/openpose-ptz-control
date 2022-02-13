@@ -23,8 +23,6 @@ class Edge(IntEnum):
     BOTTOM = 3
 
 
-VIDEO_DEVICE = int(os.getenv("VIDEO_DEVICE", 0))
-
 control_camera = None
 
 # VISCA Setup
@@ -170,7 +168,7 @@ def do_setup():
     openpose_wrapper.configure(params)
     openpose_wrapper.start()
 
-    video_capture = cv2.VideoCapture(VIDEO_DEVICE)
+    video_capture = cv2.VideoCapture(args.video_device)
 
     # MQTT Setup
     if args.mqtt:
