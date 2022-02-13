@@ -87,12 +87,12 @@ class ViscaControl(BaseMoveControl):
         )
         self.sequence_number = 1
 
-    def make_move_str(self, direction_str):
+    def make_move_str(self, direction_str: str):
         # returns a padded hex value without 0x
         spd_hex = "{0:0{1}x}".format(int(self.speed), 2)
         return self.MOVE_HEADER + spd_hex + spd_hex + direction_str
 
-    def send_packet(self, command):
+    def send_packet(self, command: str):
         payload_type = bytearray.fromhex("01 00")
         payload = bytearray.fromhex(command)
         payload_length = len(payload).to_bytes(2, "big")
