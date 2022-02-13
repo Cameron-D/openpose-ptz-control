@@ -23,17 +23,93 @@ class Edge(IntEnum):
     BOTTOM = 3
 
 
-class Visca:
+class BaseMoveControl:
+    direction = None
+    speed = None
+
+    def __init__(self, args):
+        raise NotImplementedError
+
+    def do_move(self):
+        raise NotImplementedError
+
+    def set_direction(self, direction: Move):
+        raise NotImplementedError
+
+    def set_speed(self, speed: int):
+        raise NotImplementedError
+
+
+class ViscaControl(BaseMoveControl):
     SEQUENCE_RESET = "02 00 00 01 00 00 00 01 01"
     MOVE_HEADER = "81 01 06 01 "
     LEFT = " 01 03 FF"
     RIGHT = " 02 03 FF"
     STOP = " 03 03 FF"
 
+    def __init__(self, args):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.host = args.visca_ip
+        self.port = args.visca_port
+
+        self.sequence_number = 1
+
+        self.set_direction(Move.STOP)
+        self.set_speed(args.speed_min)
+
+    def set_direction(self, direction: Move):
+        self.direction = direction
+
+    def set_speed(self, speed: int):
+        self.speed = speed
+
+    def do_move(self):
+        self.reset_sequence_number()
+
+        if self.direction == Move.LEFT:
+            self.send_packet(self.make_move_str(self.LEFT))
+        elif self.direction == Move.RIGHT:
+            self.send_packet(self.make_move_str(self.RIGHT))
+        else:
+            self.send_packet(self.make_move_str(self.STOP))
+
+        print(
+            "MOVE:",
+            Move(self.direction),
+            "@ speed",
+            self.speed,
+            "({0:0{1}x})".format(int(self.speed), 2),
+        )
+
+    def reset_sequence_number(self):
+        self.socket.sendto(
+            bytearray.fromhex(self.SEQUENCE_RESET), (self.host, self.port)
+        )
+        self.sequence_number = 1
+
+    def make_move_str(self, direction_str):
+        # returns a padded hex value without 0x
+        spd_hex = "{0:0{1}x}".format(int(self.speed), 2)
+        return self.MOVE_HEADER + spd_hex + spd_hex + direction_str
+
+    def send_packet(self, command):
+        payload_type = bytearray.fromhex("01 00")
+        payload = bytearray.fromhex(command)
+        payload_length = len(payload).to_bytes(2, "big")
+
+        message = (
+            payload_type
+            + payload_length
+            + self.sequence_number.to_bytes(4, "big")
+            + payload
+        )
+
+        self.sequence_number += 1
+        self.socket.sendto(message, (args.visca_ip, args.visca_port))
+
 
 control_camera = None
-sequence_number = 1
-visca_socket = None
+move_control = None
 video_capture = None
 openpose_wrapper = None
 mqttc = None
@@ -60,50 +136,10 @@ def mqtt_message(client, userdata, message):
         mqttc.publish("PTZ_STATE", move_state())
 
 
-def reset_sequence_number():
-    global sequence_number
-    visca_socket.sendto(
-        bytearray.fromhex(Visca.SEQUENCE_RESET), (args.visca_ip, args.visca_port)
-    )
-    sequence_number = 1
-
-
 def calculate_move_speed(smin, val, smax):
     speed_ratio = (val - smin) / smax
     speed = int(((args.speed_max - args.speed_min) * speed_ratio) + args.speed_min)
     return speed
-
-
-def make_visca_move_command(direction_str, speed):
-    # padded hex value without 0x
-    spd_hex = "{0:0{1}x}".format(int(speed), 2)
-    return Visca.MOVE_HEADER + spd_hex + spd_hex + direction_str
-
-
-def do_visca_move(direction, speed):
-    reset_sequence_number()
-    print(
-        "MOVE:", Move(direction), "@ speed", speed, "({0:0{1}x})".format(int(speed), 2)
-    )
-
-    if direction == Move.LEFT:
-        send_visca_packet(make_visca_move_command(Visca.LEFT, speed))
-    elif direction == Move.RIGHT:
-        send_visca_packet(make_visca_move_command(Visca.RIGHT, speed))
-    else:
-        send_visca_packet(make_visca_move_command(Visca.STOP, speed))
-
-
-def send_visca_packet(command):
-    global sequence_number
-    payload_type = bytearray.fromhex("01 00")
-    payload = bytearray.fromhex(command)
-    payload_length = len(payload).to_bytes(2, "big")
-    message = (
-        payload_type + payload_length + sequence_number.to_bytes(4, "big") + payload
-    )
-    sequence_number += 1
-    visca_socket.sendto(message, (args.visca_ip, args.visca_port))
 
 
 def move_state():
@@ -153,9 +189,9 @@ def sigint_handler(signal_received, frame):
 
 
 def do_setup():
-    global visca_socket, openpose_wrapper, mqttc, video_capture
+    global visca_socket, openpose_wrapper, mqttc, video_capture, move_control
 
-    visca_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    move_control = ViscaControl(args)
 
     # OpenPose Setep
     params = dict()
@@ -248,10 +284,11 @@ def calculate_boundaries(bounding, regions):
 def main_loop():
     bounding = []
 
-    direction = Move.STOP
-    last_direction = direction
-    speed = 1
-    last_speed = speed
+    move_control.set_direction(Move.STOP)
+    last_direction = move_control.direction
+
+    move_control.set_speed(args.speed_min)
+    last_speed = move_control.speed
 
     frame_count = 0
 
@@ -299,21 +336,21 @@ def main_loop():
 
             if lrmiddle < l_edge:
                 speed = calculate_move_speed(0, l_edge - lrmiddle, l_edge)
-                direction = Move.LEFT
+                move_control.set_direction(Move.LEFT)
             elif lrmiddle > r_edge:
                 speed = calculate_move_speed(r_edge, lrmiddle, width)
-                direction = Move.RIGHT
+                move_control.set_direction(Move.RIGHT)
             else:
-                speed = args.speed_min
-                direction = Move.STOP
+                move_control.set_speed(args.speed_min)
+                move_control.set_direction(Move.STOP)
         else:
-            direction = Move.STOP
+            move_control.set_direction(Move.STOP)
 
-        if direction != last_direction or speed != last_speed:
+        if move_control.direction != last_direction or move_control.speed != last_speed:
             if control_camera:
-                do_visca_move(direction, speed)
-            last_direction = direction
-            last_speed = speed
+                move_control.do_move()
+            last_direction = move_control.direction
+            last_speed = move_control.speed
 
         # Showing the output Image
         if args.ui:
