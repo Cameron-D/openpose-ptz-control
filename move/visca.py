@@ -1,9 +1,9 @@
-from . import BaseMoveControl
-from ..pose import Move
+from move import BaseMoveControl
+from pose import Move
 import socket
 
 
-class ViscaControl(BaseMoveControl):
+class ViscaMoveControl(BaseMoveControl):
     SEQUENCE_RESET = "02 00 00 01 00 00 00 01 01"
     MOVE_HEADER = "81 01 06 01 "
     LEFT = " 01 03 FF"

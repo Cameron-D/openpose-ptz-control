@@ -1,4 +1,4 @@
-from ..pose import Move
+from pose import Move
 
 
 class BaseMoveControl:
