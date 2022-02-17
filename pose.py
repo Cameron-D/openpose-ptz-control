@@ -4,7 +4,8 @@ import paho.mqtt.client as mqtt
 from enum import IntEnum
 from signal import signal, SIGINT
 from sys import exit
-from move import ViscaControl
+from move import ViscaMoveControl
+from video import CaptureVideoSource
 
 
 class Move(IntEnum):
@@ -25,7 +26,7 @@ class PTZTrack:
 
     def __init__(self, args):
         self.args = args
-        self.move = ViscaControl(self.args)
+        self.move = ViscaMoveControl(self.args)
 
         # OpenPose Setup
         params = dict()
@@ -37,7 +38,7 @@ class PTZTrack:
         self.openpose.start()
 
         # Video Source Setup
-        self.video_capture = cv2.VideoCapture(args.video_device)
+        self.video_source = CaptureVideoSource(args)
 
         # MQTT Setup
         if self.args.mqtt:
@@ -117,12 +118,12 @@ class PTZTrack:
             self.mqtt_publish_state()
             time.sleep(0.1)
             self.mqttc.loop_stop()
-        self.video_capture.release()
+        self.video_source.close()
         cv2.destroyAllWindows()
         exit(0)
 
     def read_frame(self):
-        ret, frame = self.video_capture.read()
+        ret, frame = self.video_source.frame_read()
         frame = cv2.resize(frame, (1280, 720))
         return ret, frame
 
@@ -182,7 +183,7 @@ class PTZTrack:
 
         frame_count = 0
 
-        while self.video_capture.isOpened():
+        while self.video_device.source_available():
             check, frame = self.read_frame()
 
             if not check:
