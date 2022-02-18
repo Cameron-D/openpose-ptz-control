@@ -4,14 +4,8 @@ import paho.mqtt.client as mqtt
 from enum import IntEnum
 from signal import signal, SIGINT
 from sys import exit
-from move import ViscaMoveControl
-from video import CaptureVideoSource
-
-
-class Move(IntEnum):
-    STOP = 0
-    LEFT = 1
-    RIGHT = 2
+from movecontrol import Move, ViscaMoveControl
+from videosource import CaptureVideoSource
 
 
 class Edge(IntEnum):
@@ -183,7 +177,7 @@ class PTZTrack:
 
         frame_count = 0
 
-        while self.video_device.source_available():
+        while self.video_source.source_available():
             check, frame = self.read_frame()
 
             if not check:

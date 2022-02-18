@@ -1,6 +1,27 @@
-from move import BaseMoveControl
-from pose import Move
-import socket
+from enum import IntEnum
+
+
+class Move(IntEnum):
+    STOP = 0
+    LEFT = 1
+    RIGHT = 2
+
+
+class BaseMoveControl:
+    direction = None
+    speed = None
+
+    def __init__(self, args):
+        raise NotImplementedError
+
+    def do_move(self):
+        raise NotImplementedError
+
+    def set_direction(self, direction):
+        raise NotImplementedError
+
+    def set_speed(self, speed: int):
+        raise NotImplementedError
 
 
 class ViscaMoveControl(BaseMoveControl):
@@ -11,6 +32,8 @@ class ViscaMoveControl(BaseMoveControl):
     STOP = " 03 03 FF"
 
     def __init__(self, args):
+        import socket
+
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.host = args.visca_ip
         self.port = args.visca_port
@@ -20,7 +43,7 @@ class ViscaMoveControl(BaseMoveControl):
         self.set_direction(Move.STOP)
         self.set_speed(args.speed_min)
 
-    def set_direction(self, direction: Move):
+    def set_direction(self, direction):
         self.direction = direction
 
     def set_speed(self, speed: int):
