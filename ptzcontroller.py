@@ -1,5 +1,4 @@
-from pydoc import describe
-import cv2, time, argparse, time, sys
+import cv2, time, argparse, time
 import pyopenpose as op
 import paho.mqtt.client as mqtt
 from enum import IntEnum
