@@ -331,6 +331,7 @@ if __name__ == "__main__":
         help="If provided, display a UI interface visualising the processing (default: %(default)s)",
     )
     parser.add_argument(
+        "-v",
         "--video_source",
         default="device",
         help="Type of video input source to use. 'device' for web camera/v4l2, or 'ndi' for NDI input. (default: %(default)s)",

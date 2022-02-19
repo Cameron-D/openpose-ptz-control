@@ -60,7 +60,7 @@ If all goes well it should start up with no errors, print out in the console whe
 
 * ✅ Smooth acceleration for panning (start slow, accelerate if the person nears the edges of the frame)
 * Support for multiple people in view, but following only one
-* Read direct NDI frames rather than relying on a custom build of ffmpeg and v4l2loopback
+* ✅ Read direct NDI frames rather than relying on a custom build of ffmpeg and v4l2loopback
 * Track a persons head rather than the full body bounding box
 * An alternative library for people detection (i.e. tf-pose-estimation seems to be faster?)
 
@@ -68,19 +68,23 @@ If all goes well it should start up with no errors, print out in the console whe
 
 There are a handful of options that can be configured and passed to the container as launch parameters. The only required parameter is the camera's IP.
 
-| Option                | Default     | Description |
-| --------------------- | ----------- | ----------- |
-| Camera IP             | None        | IP address of the PTZ camera. IP or hostname accepted. Provided as a direct parameter. |
-| `-p `/`--visca_port`  | `52381`     | Port that camera accepts VISCA commands on. |
-| `-m`/`--mqtt`         | `False`     | Whether or not to enable to MQTT funtionality. True or False. |
-| `--mqtt_host`         | `127.0.0.1` | IP address of MQTT broker. IP or hostname accepted. |
-| `-c`/`--control`      | `False`     | Whether to start controlling the camera automatically or wait for a start command. Can be True or False. |
-| `-b`/`--boundary `    | `0.35`      | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side). 0 - 0.5 accepted. |
-| `-s`/`--speed_min`    | `1`         | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than `MAX_SPEED` |
-| `-S`/`--speed_max`    | `16`        | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than `MIN_SPEED` | 
-| `--net_resolution`    | `-1x128`    | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
-| `-v`/`--video_device` | `0`         | Which video device to use. Defaults to 0 (/dev/video0) |
-| `--ui`                | `0`         | Show the processed video in a window. Requires futher setup (see below). Can be `1` or `0`. |
+| Option                   | Default     | Description |
+| ------------------------ | ----------- | ----------- |
+| Camera IP                | None        | IP address of the PTZ camera. IP or hostname accepted. Provided as a direct parameter. |
+| `-p `/`--visca_port`     | `52381`     | Port that camera accepts VISCA commands on. |
+| `-m`/`--mqtt`            | `False`     | Whether or not to enable to MQTT funtionality. True or False. |
+| `--mqtt_host`            | `127.0.0.1` | IP address of MQTT broker. IP or hostname accepted. |
+| `-c`/`--control`         | `False`     | Whether to start controlling the camera automatically or wait for a start command. Can be True or False. |
+| `-b`/`--boundary `       | `0.35`      | How far toward the screen edge can the person move before the camera starts following (default is 35% of screen size either side). 0 - 0.5 accepted. |
+| `-s`/`--speed_min`       | `1`         | Minimum panning speed for smooth accelerating. 0-23 accepted. Must be less than `MAX_SPEED` |
+| `-S`/`--speed_max`       | `16`        | Maximum panning speed for smooth accelerating. 1-24 accepted. Must me more than `MIN_SPEED` | 
+| `--net_resolution`       | `-1x128`    | Parameter sent directly to openpose. [See the Openpose documentation](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/demo_quick_start.md#improving-memory-and-speed-but-decreasing-accuracy). |
+| `--ui`                   | `0`         | Show the processed video in a window. Requires futher setup (see below). Can be `1` or `0`. |
+| `-v ` / `--video_source` | `device`    | Which video input source to use. Can be `device` or `ndi` for webcamera/v4l2 device, or NDI source. |
+| `--video_device`         | `0`         | Which video device to use when source type is `device`. Defaults to 0 (/dev/video0) |
+| `--ndi_source`           | None        | Name of NDI device and source to read video from |
+| `--ndi_extra_ips`        | None        | Additional IPs for NDI to search for the source. Usually required when using Docker as multicast packets generally won't be received |
+
 
 
 ## Companion Setup
