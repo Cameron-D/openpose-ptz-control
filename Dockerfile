@@ -51,6 +51,6 @@ RUN cd / && \
 
 
 WORKDIR /ptztrack
-COPY *.py .
+COPY *.py ./
 
 ENTRYPOINT ["python3", "ptzcontroller.py"]
