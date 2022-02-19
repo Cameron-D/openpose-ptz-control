@@ -32,9 +32,9 @@ class PTZTrack:
         self.openpose.start()
 
         # Video Source Setup
-        if args.video_source == "device":
+        if self.args.video_source == "device":
             self.video_source = CaptureVideoSource(args)
-        elif args.video_source == "ndi":
+        elif self.args.video_source == "ndi":
             self.video_source = NDIVideoSource(args)
         else:
             print("Invalid video source provided.")
@@ -138,7 +138,7 @@ class PTZTrack:
             return True
 
     def calculate_edges(self, frame_shape):
-        l_edge = int(frame_shape[1] * args.boundary)
+        l_edge = int(frame_shape[1] * self.args.boundary)
         r_edge = frame_shape[1] - l_edge
         height = frame_shape[0]
         width = frame_shape[1]
@@ -213,9 +213,10 @@ class PTZTrack:
             frame, regions = self.process_datum_keypoints(frame, openpose_datum)
 
             if len(regions) > 0:
-                # calculate the bounding boxes of each person
+                # calculate the bounding boxes of all the people
                 bounding = self.calculate_boundaries(bounding, regions)
 
+                # Calculate the middle of the box
                 lrmiddle = int(
                     ((bounding[Edge.RIGHT] - bounding[Edge.LEFT]) / 2)
                     + bounding[Edge.LEFT]
@@ -225,6 +226,7 @@ class PTZTrack:
                     + bounding[Edge.TOP]
                 )
 
+                # Draw the bounding boxes and middle point
                 cv2.rectangle(
                     frame,
                     (bounding[Edge.LEFT], bounding[Edge.TOP]),
@@ -241,6 +243,7 @@ class PTZTrack:
                 )
                 cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
 
+                # Calculate the move speed as a ratio of the distance between the bounding box edge and frame edge.
                 if lrmiddle < l_edge:
                     self.move.set_speed(
                         self.calculate_speed(0, l_edge - lrmiddle, l_edge)
@@ -250,11 +253,12 @@ class PTZTrack:
                     self.move.set_speed(self.calculate_speed(r_edge, lrmiddle, width))
                     self.move.set_direction(Move.RIGHT)
                 else:
-                    self.move.set_speed(args.speed_min)
+                    self.move.set_speed(self.args.speed_min)
                     self.move.set_direction(Move.STOP)
             else:
                 self.move.set_direction(Move.STOP)
 
+            # If either the speed or direction have changed then send the move command to the camera
             if self.move.direction != last_direction or self.move.speed != last_speed:
                 if self.control_camera:
                     self.move.do_move()
