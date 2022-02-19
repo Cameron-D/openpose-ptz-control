@@ -1,8 +1,8 @@
 # Openpose PTZ control
 
-Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to identify people in an video feed (currently only via v4l2 device) and issue VISCA over IP PTZ commands to a networked camera. MQTT is used to issue commands to turn the control on/off.
+Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to identify people in an video feed, from v4l2 or NDI, and issue VISCA over IP PTZ commands to a networked camera. MQTT can be used to issue commands to turn the control on/off.
 
-Currently tested and used with a BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake.
+Currently tested and used with a BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake. NDI testing is ongoing.
 
 It tracks the middle of all people it finds, so it probably won't do much if there are several people visible.
 
@@ -27,7 +27,7 @@ $ docker build -t ptzcontrol:11.2 .
 
 ### Video Feed
 
-Running it assumes the webcam/video feed is available at `/dev/video0`...
+Running the program will read from `/dev/video0` by default...
 
 If you have ffmpeg with NDI support, the following will work to expose it as a video device (limiting to 10 FPS to reduce processing later):
 ```
@@ -37,7 +37,7 @@ ffmpeg -f libndi_newtek -extra_ips "10.1.1.174" -i "BIRDDOG-ABC123 (CAM)" -vf "f
 
 ### MQTT
 
-By default the program will automaticall start controlling the camera when launched. If you enable MQTT support and provide an MQTT host (`--mqtt --mqtt_host 10.1.1.175`) commands can be provided to the program through an MQTT broker. It is easiest to use Docker to run a broker:
+By default the program will automatically start controlling the camera when launched. If you enable MQTT support and provide an MQTT host (`-m --mqtt_host 10.1.1.175`) commands can be provided to the program through an MQTT broker. It is easiest to use Docker to run a broker:
 
 ```
 docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mosquitto 
@@ -45,13 +45,11 @@ docker run -d --restart unless-stopped --name mosquitto -p 1883:1883 eclipse-mos
 
 ### PTZ Controller
 
-* Set `--mqtt_host` to the IP/hostname of the MQTT broker (probably the address of the control computer, if you used the above command to run mosquitto)
-* Providing `--control` causes it to automatically start controlling the camera. Remove this option if you would like control to default to OFF (and to turn on/toggle later via a MQTT/StreamDeck).  
-* Last argument is the camera's IP/hostname
+Will read from `/dev/video0` and automatically start controlling the camera at the supplied IP by default.
 
 ```
 $ docker run --gpus all --name ptztrack --restart unless-stopped -it \
-    --device /dev/video0 ptztrack:11.1 --control --mqtt_host 10.1.1.175 10.1.1.174
+    --device /dev/video0 ptztrack:11.2 10.1.1.174
 ```
 
 If all goes well it should start up with no errors, print out in the console when it's moving, and actually move the camera.
@@ -61,7 +59,7 @@ If all goes well it should start up with no errors, print out in the console whe
 * ✅ Smooth acceleration for panning (start slow, accelerate if the person nears the edges of the frame)
 * Support for multiple people in view, but following only one
 * ✅ Read direct NDI frames rather than relying on a custom build of ffmpeg and v4l2loopback
-* Track a persons head rather than the full body bounding box
+* More focus on tracking a persons head rather than the full body bounding box
 * An alternative library for people detection (i.e. tf-pose-estimation seems to be faster?)
 
 ## Configuration Options
