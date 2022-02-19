@@ -36,6 +36,7 @@ RUN cd /openpose/build && \
 
 ENV LD_LIBRARY_PATH=/openpose/build/python/openpose:/usr/lib
 
+# Installing NDI and compiling python bindings
 COPY NDI/libndi.so.4 /usr/lib/libndi.so
 COPY NDI/include/* /usr/include/
 
@@ -50,6 +51,6 @@ RUN cd / && \
 
 
 WORKDIR /ptztrack
-COPY pose.py .
+COPY *.py .
 
-ENTRYPOINT ["python3", "pose.py"]
+ENTRYPOINT ["python3", "ptzcontroller.py"]
