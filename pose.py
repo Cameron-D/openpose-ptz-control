@@ -1,11 +1,12 @@
-import cv2, time, socket, argparse, time
+from pydoc import describe
+import cv2, time, argparse, time, sys
 import pyopenpose as op
 import paho.mqtt.client as mqtt
 from enum import IntEnum
 from signal import signal, SIGINT
 from sys import exit
 from movecontrol import Move, ViscaMoveControl
-from videosource import CaptureVideoSource
+from videosource import CaptureVideoSource, NDIVideoSource
 
 
 class Edge(IntEnum):
@@ -32,12 +33,18 @@ class PTZTrack:
         self.openpose.start()
 
         # Video Source Setup
-        self.video_source = CaptureVideoSource(args)
+        if args.video_source == "device":
+            self.video_source = CaptureVideoSource(args)
+        elif args.video_source == "ndi":
+            self.video_source = NDIVideoSource(args)
+        else:
+            print("Invalid video source provided.")
+            exit()
 
         # MQTT Setup
         if self.args.mqtt:
             self.mqttc = mqtt.Client("PTZTrack")
-            self.mqttc.connect(args.mqtt_host)
+            self.mqttc.connect(self.args.mqtt_host)
             self.mqttc.loop_start()
             self.mqttc.subscribe("PTZ_SETSTATE")
             self.mqttc.on_message = self.mqtt_message
@@ -118,16 +125,14 @@ class PTZTrack:
 
     def read_frame(self):
         ret, frame = self.video_source.frame_read()
-        frame = cv2.resize(frame, (1280, 720))
+        if ret and (frame.shape[0] != 720) and (frame.shape[1] != 1280):
+            frame = cv2.resize(frame, (1280, 720))
         return ret, frame
 
     def mqtt_publish_state(self):
         self.mqttc.publish("PTZ_STATE", self.move_state_str())
 
     def show_ui(self, frame):
-        if (frame.shape[0] != 720) and (frame.shape[1] != 1280):
-            frame = cv2.resize(frame, (1280, 720))
-
         cv2.imshow("PTZTrack Frame", frame)
 
         if cv2.waitKey(25) & 0xFF == ord("q"):
@@ -146,10 +151,11 @@ class PTZTrack:
     def process_datum_keypoints(self, frame, datum):
         regions = []
 
-        for i in range(0, datum.poseKeypoints.shape[0]):
-            p = self.get_keypoints_rectangle(datum.poseKeypoints[i], 0.1)
-            regions.append([p[0], p[1], p[2] - p[0], p[3] - p[1]])
-            cv2.rectangle(frame, (p[0], p[1]), (p[2], p[3]), (0, 255, 255), 2)
+        if datum.poseKeypoints:
+            for i in range(0, datum.poseKeypoints.shape[0]):
+                p = self.get_keypoints_rectangle(datum.poseKeypoints[i], 0.1)
+                regions.append([p[0], p[1], p[2] - p[0], p[3] - p[1]])
+                cv2.rectangle(frame, (p[0], p[1]), (p[2], p[3]), (0, 255, 255), 2)
 
         return frame, regions
 
@@ -180,20 +186,35 @@ class PTZTrack:
         while self.video_source.source_available():
             check, frame = self.read_frame()
 
+            # If there is no video data
             if not check:
+                # sleep momentarily so we can't waste time in an endless loop
                 time.sleep(0.01)
+                continue
+
+            # Publish control state occasionally
+            frame_count += 1
+            if self.args.mqtt and frame_count == 20:
+                self.mqtt_publish_state()
+                frame_count = 0
+
+            # Don't spend time processing if we're not going to control the camera
+            if not self.control_camera:
                 continue
 
             l_edge, r_edge, height, width, bounding = self.calculate_edges(frame.shape)
 
+            # Pass the frame data to openpose
             openpose_datum = op.Datum()
             openpose_datum.cvInputData = frame
             self.openpose.emplaceAndPop(op.VectorDatum([openpose_datum]))
             frame = openpose_datum.cvOutputData
 
+            # Actually get openpose to process the keypoints
             frame, regions = self.process_datum_keypoints(frame, openpose_datum)
 
             if len(regions) > 0:
+                # calculate the bounding boxes of each person
                 bounding = self.calculate_boundaries(bounding, regions)
 
                 lrmiddle = int(
@@ -245,12 +266,6 @@ class PTZTrack:
             if self.args.ui:
                 if self.show_ui(frame):
                     break
-
-            # Publish control state occasionally
-            frame_count += 1
-            if self.args.mqtt and frame_count == 20:
-                self.mqtt_publish_state()
-                frame_count = 0
 
 
 if __name__ == "__main__":
@@ -311,16 +326,30 @@ if __name__ == "__main__":
         help="Argument for net_resolution passed directly to OpenCV (default: %(default)s)",
     )
     parser.add_argument(
-        "-v",
+        "--ui",
+        action="store_true",
+        help="If provided, display a UI interface visualising the processing (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--video_source",
+        default="device",
+        help="Type of video input source to use. 'device' for web camera/v4l2, or 'ndi' for NDI input. (default: %(default)s)",
+    )
+    parser.add_argument(
         "--video_device",
         default=0,
         type=int,
         help="Video device number to read frames from (default: %(default)s)",
     )
     parser.add_argument(
-        "--ui",
-        action="store_true",
-        help="If provided, display a UI interface visualising the processing (default: %(default)s)",
+        "--ndi_source",
+        default=None,
+        help="NDI device/source name. Required if using NDI.",
+    )
+    parser.add_argument(
+        "--ndi_extra_ips",
+        default=None,
+        help="Device IPs to pass to NDI. Generally required when using docker as multicast packets can't be receieved.",
     )
     args = parser.parse_args()
 

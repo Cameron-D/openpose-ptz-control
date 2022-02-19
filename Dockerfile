@@ -34,7 +34,20 @@ RUN cd /openpose/build && \
     cd /usr/local/lib/python3.6/dist-packages && \
     ln -s pyopenpose.cpython-36m-x86_64-linux-gnu.so pyopenpose
 
-ENV LD_LIBRARY_PATH=/openpose/build/python/openpose
+ENV LD_LIBRARY_PATH=/openpose/build/python/openpose:/usr/lib
+
+COPY NDI/libndi.so.4 /usr/lib/libndi.so
+COPY NDI/include/* /usr/include/
+
+RUN cd / && \
+    git clone https://github.com/buresu/ndi-python.git && \
+    cd /ndi-python && \
+    git submodule init && git submodule update && \
+    cd lib/pybind11 && git checkout v2.9.1 && \
+    cd /ndi-python && mkdir build && cd build && \
+    cmake .. && cmake --build . --config Release && \
+    cp NDIlib*.so /usr/lib/python3.6/NDIlib.so
+
 
 WORKDIR /ptztrack
 COPY pose.py .
