@@ -55,7 +55,7 @@ Will read from `/dev/video0` and automatically start controlling the camera at t
 
 ```
 $ docker run --gpus all --name ptztrack --restart unless-stopped -it \
-    --device /dev/video0 ptztrack:11.2 10.1.1.174
+    --device /dev/video0 ptzcontrol:11.2 10.1.1.174
 ```
 
 If all goes well it should start up with no errors, print out in the console when it's moving, and actually move the camera.
