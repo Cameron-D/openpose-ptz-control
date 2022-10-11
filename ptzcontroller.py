@@ -150,7 +150,7 @@ class PTZTrack:
     def process_datum_keypoints(self, frame, datum):
         regions = []
 
-        if datum.poseKeypoints:
+        if datum.poseKeypoints is not None and len(datum.poseKeypoints) > 0:
             for i in range(0, datum.poseKeypoints.shape[0]):
                 p = self.get_keypoints_rectangle(datum.poseKeypoints[i], 0.1)
                 regions.append([p[0], p[1], p[2] - p[0], p[3] - p[1]])
@@ -250,7 +250,9 @@ class PTZTrack:
                     )
                     self.move.set_direction(Move.LEFT)
                 elif lrmiddle > r_edge:
-                    self.move.set_speed(self.calculate_speed(r_edge, lrmiddle, width))
+                    self.move.set_speed(
+                         self.calculate_speed(0, lrmiddle - r_edge, l_edge)
+                    )
                     self.move.set_direction(Move.RIGHT)
                 else:
                     self.move.set_speed(self.args.speed_min)
