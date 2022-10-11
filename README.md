@@ -4,9 +4,11 @@ Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to ide
 
 ## Tested cameras:
 
-* BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake. NDI testing is ongoing.
+* BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. NDI testing is ongoing. 
 
 * Vaddio ConferenceSHOT 10 running newest firmware with VISCA IP support
+
+MQTT is supported to control automatic control on/off. This can be done with [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module. 
 
 It tracks the middle of all people it finds, so it probably won't do much if there are several people visible.
 
