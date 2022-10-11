@@ -6,6 +6,8 @@ class Move(IntEnum):
     STOP = 0
     LEFT = 1
     RIGHT = 2
+    UP = 3
+    DOWN = 4
 
 
 class BaseMoveControl:
@@ -42,6 +44,8 @@ class ViscaMoveControl(BaseMoveControl):
     LEFT = " 01 03 FF"
     RIGHT = " 02 03 FF"
     STOP = " 03 03 FF"
+    UP = " 03 02 FF"
+    DOWN = " 03 01 FF"
 
     def __init__(self, args: Namespace):
         import socket
@@ -68,6 +72,10 @@ class ViscaMoveControl(BaseMoveControl):
             self.send_packet(self.make_move_str(self.LEFT))
         elif self.direction == Move.RIGHT:
             self.send_packet(self.make_move_str(self.RIGHT))
+        elif self.direction == Move.UP:
+            self.send_packet(self.make_move_str(self.UP))
+        elif self.direction == Move.DOWN:
+            self.send_packet(self.make_move_str(self.DOWN))
         else:
             self.send_packet(self.make_move_str(self.STOP))
 

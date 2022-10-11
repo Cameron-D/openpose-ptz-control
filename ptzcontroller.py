@@ -73,10 +73,17 @@ class PTZTrack:
             self.control_camera = not self.control_camera
             self.mqtt_publish_state()
 
-    def calculate_speed(self, smin: int, val: int, smax: int):
+    def calculate_pan_speed(self, smin: int, val: int, smax: int):
         speed_ratio = (val - smin) / smax
         speed = int(
             ((self.args.speed_max - self.args.speed_min) * speed_ratio)
+            + self.args.speed_min
+        )
+        return speed
+    def calculate_tilt_speed(self, smin: int, val: int, smax: int):
+        speed_ratio = (val - smin) / smax
+        speed = int(
+            ((self.args.speed_max - (self.args.speed_min * 1.75)) * speed_ratio)
             + self.args.speed_min
         )
         return speed
@@ -142,10 +149,12 @@ class PTZTrack:
         r_edge = frame_shape[1] - l_edge
         height = frame_shape[0]
         width = frame_shape[1]
+        lower_edge = int(frame_shape[0] * .45)
+        upper_edge = frame_shape[0] - lower_edge
 
         bounding = [frame_shape[1], height, 0, 0]
 
-        return l_edge, r_edge, height, width, bounding
+        return l_edge, r_edge, height, width, lower_edge, upper_edge, bounding
 
     def process_datum_keypoints(self, frame, datum):
         regions = []
@@ -201,7 +210,10 @@ class PTZTrack:
             if not self.control_camera:
                 continue
 
-            l_edge, r_edge, height, width, bounding = self.calculate_edges(frame.shape)
+            l_edge, r_edge, height, width, lower_edge, upper_edge, bounding = self.calculate_edges(frame.shape)
+##            lower_edge = (frame_shape[0] * 0.45)
+##            upper_edge = (frame_shape[0] - lower_edge)
+            
 
             # Pass the frame data to openpose
             openpose_datum = op.Datum()
@@ -222,8 +234,8 @@ class PTZTrack:
                     + bounding[Edge.LEFT]
                 )
                 udmiddle = int(
-                    ((bounding[Edge.BOTTOM] - bounding[Edge.TOP]) / 2)
-                    + bounding[Edge.TOP]
+                    ((bounding[Edge.TOP] - bounding[Edge.BOTTOM]) / 2)
+                    + bounding[Edge.BOTTOM]
                 )
 
                 # Draw the bounding boxes and middle point
@@ -242,18 +254,29 @@ class PTZTrack:
                     4,
                 )
                 cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
+                cv2.rectangle(frame, (0, lower_edge), (width, upper_edge), (0, 255, 0), 4)
 
                 # Calculate the move speed as a ratio of the distance between the bounding box edge and frame edge.
                 if lrmiddle < l_edge:
                     self.move.set_speed(
-                        self.calculate_speed(0, l_edge - lrmiddle, l_edge)
+                        self.calculate_pan_speed(0, l_edge - lrmiddle, l_edge)
                     )
                     self.move.set_direction(Move.LEFT)
                 elif lrmiddle > r_edge:
                     self.move.set_speed(
-                         self.calculate_speed(0, lrmiddle - r_edge, l_edge)
+                         self.calculate_pan_speed(0, lrmiddle - r_edge, l_edge)
                     )
                     self.move.set_direction(Move.RIGHT)
+                elif udmiddle < lower_edge:
+                    self.move.set_speed(
+                        self.calculate_tilt_speed(0, lower_edge - udmiddle, lower_edge)
+                    )
+                    self.move.set_direction(Move.DOWN)
+                elif udmiddle > upper_edge:
+                    self.move.set_speed(
+                         self.calculate_tilt_speed(0, udmiddle - upper_edge, lower_edge)
+                    )
+                    self.move.set_direction(Move.UP)
                 else:
                     self.move.set_speed(self.args.speed_min)
                     self.move.set_direction(Move.STOP)
@@ -271,6 +294,7 @@ class PTZTrack:
             if self.args.ui:
                 if self.show_ui(frame):
                     break
+
 
 
 if __name__ == "__main__":
