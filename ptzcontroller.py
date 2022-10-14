@@ -1,6 +1,8 @@
 import cv2, time, argparse, time
 import pyopenpose as op
 import paho.mqtt.client as mqtt
+import os, fcntl
+import v4l2
 from enum import IntEnum
 from signal import signal, SIGINT
 from sys import exit
@@ -21,6 +23,24 @@ class PTZTrack:
     def __init__(self, args):
         self.args = args
         self.move = ViscaMoveControl(self.args)
+        self.zooming = False
+        self.odevice = open("/dev/video1", "wb")
+        
+        # V4L2 Setup
+        cap                         = cv2.VideoCapture(0)
+        ret, im                     = cap.read()
+        height2, width2, channels2  = im.shape
+
+        format                      = v4l2.v4l2_format()
+        format.type                 = v4l2.V4L2_BUF_TYPE_VIDEO_OUTPUT
+        format.fmt.pix.field        = v4l2.V4L2_FIELD_NONE
+        format.fmt.pix.pixelformat  = v4l2.V4L2_PIX_FMT_BGR24
+        format.fmt.pix.width        = 1280
+        format.fmt.pix.height       = 720
+        format.fmt.pix.bytesperline = 1280 * channels2
+        format.fmt.pix.sizeimage    = 1280 * 720 * channels2
+
+        print ("set format result (0 is good):{}".format(fcntl.ioctl(self.odevice, v4l2.VIDIOC_S_FMT, format)))
 
         # OpenPose Setup
         params = dict()
@@ -180,8 +200,21 @@ class PTZTrack:
 
         return bounding
 
+    
+    
     def main_loop(self):
         bounding = []
+        val1   = 10
+        val2   = 10
+        val3   = 10
+        val4   = 10
+        val5   = 10
+        val6   = 10
+        val7   = 10
+        val8   = 10
+        val9   = 10
+        val10  = 10
+
 
         self.move.set_direction(Move.STOP)
         last_direction = self.move.direction
@@ -197,8 +230,10 @@ class PTZTrack:
             # If there is no video data
             if not check:
                 # sleep momentarily so we can't waste time in an endless loop
+                print("No Video Data!")
                 time.sleep(0.01)
                 continue
+
 
             # Publish control state occasionally
             frame_count += 1
@@ -227,6 +262,28 @@ class PTZTrack:
             if len(regions) > 0:
                 # calculate the bounding boxes of all the people
                 bounding = self.calculate_boundaries(bounding, regions)
+
+                val1 = val2
+                val2 = val3
+                val3 = val4
+                val4 = val5
+                val5 = val6
+                val6 = val7
+                val7 = val8
+                val8 = val9
+                val9 = val10
+                val10 = (bounding[Edge.TOP] - bounding[Edge.BOTTOM])
+                val11 = (val6 + val7 + val8 + val9 + val10) / 5 
+                val11 = abs(val11)
+                recty1 = (height - val11) * 0.5
+                recty2 = recty1 + val11
+                cv2.rectangle(
+                    frame, 
+                    (20, int(recty1)), 
+                    (20, int(recty2)), 
+                    (255, 255, 0),
+                    4,
+                )
 
                 # Calculate the middle of the box
                 lrmiddle = int(
@@ -257,6 +314,8 @@ class PTZTrack:
                 cv2.rectangle(frame, (0, lower_edge), (width, upper_edge), (0, 255, 0), 4)
 
                 # Calculate the move speed as a ratio of the distance between the bounding box edge and frame edge.
+                print("Average Height: " + str(val11))
+                print("Zout threshold: " + str(.85 * height))
                 if lrmiddle < l_edge:
                     self.move.set_speed(
                         self.calculate_pan_speed(0, l_edge - lrmiddle, l_edge)
@@ -277,10 +336,22 @@ class PTZTrack:
                          self.calculate_tilt_speed(0, udmiddle - upper_edge, lower_edge)
                     )
                     self.move.set_direction(Move.UP)
+                elif val11 >= (.75 * height):
+                      self.move.set_direction(Move.ZOUT)
+                      self.zooming = True
+
+                elif val11 <= (.55 * height):
+                      self.move.set_direction(Move.ZIN)
+                      self.zooming = True
                 else:
+                    if self.zooming:
+                        self.move.set_direction(Move.ZSTOP)
+                        self.move.do_move()
+                        self.zooming = False
                     self.move.set_speed(self.args.speed_min)
                     self.move.set_direction(Move.STOP)
             else:
+                
                 self.move.set_direction(Move.STOP)
 
             # If either the speed or direction have changed then send the move command to the camera
@@ -294,7 +365,8 @@ class PTZTrack:
             if self.args.ui:
                 if self.show_ui(frame):
                     break
-
+            #write frame to v4l2 loopback
+            self.odevice.write(frame)
 
 
 if __name__ == "__main__":
