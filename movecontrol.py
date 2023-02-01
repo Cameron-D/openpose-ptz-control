@@ -6,6 +6,11 @@ class Move(IntEnum):
     STOP = 0
     LEFT = 1
     RIGHT = 2
+    UP = 3
+    DOWN = 4
+    ZIN = 5
+    ZOUT = 6
+    ZSTOP = 7
 
 
 class BaseMoveControl:
@@ -42,6 +47,11 @@ class ViscaMoveControl(BaseMoveControl):
     LEFT = " 01 03 FF"
     RIGHT = " 02 03 FF"
     STOP = " 03 03 FF"
+    UP = " 03 02 FF"
+    DOWN = " 03 01 FF"
+    ZIN = "81 01 04 07 22 FF"
+    ZOUT = "81 01 04 07 03 FF"
+    ZSTOP = "81 01 04 07 00 FF"
 
     def __init__(self, args: Namespace):
         import socket
@@ -68,6 +78,16 @@ class ViscaMoveControl(BaseMoveControl):
             self.send_packet(self.make_move_str(self.LEFT))
         elif self.direction == Move.RIGHT:
             self.send_packet(self.make_move_str(self.RIGHT))
+        elif self.direction == Move.UP:
+            self.send_packet(self.make_move_str(self.UP))
+        elif self.direction == Move.DOWN:
+            self.send_packet(self.make_move_str(self.DOWN))
+        elif self.direction == Move.ZIN:
+            self.send_packet(self.ZIN)
+        elif self.direction == Move.ZOUT:
+            self.send_packet(self.ZOUT)
+        elif self.direction == Move.ZSTOP:
+            self.send_packet(self.ZSTOP)
         else:
             self.send_packet(self.make_move_str(self.STOP))
 
@@ -88,7 +108,7 @@ class ViscaMoveControl(BaseMoveControl):
         """
 
         self.socket.sendto(
-            bytearray.fromhex(self.SEQUENCE_RESET), (self.host, self.port)
+            bytearray.fromhex(self.SEQUENCE_RESET), (self.host, int(self.port))
         )
         self.sequence_number = 1
 
@@ -122,4 +142,4 @@ class ViscaMoveControl(BaseMoveControl):
         )
 
         self.sequence_number += 1
-        self.socket.sendto(message, (self.host, self.port))
+        self.socket.sendto(message, (self.host, int(self.port)))

@@ -2,7 +2,13 @@
 
 Uses [openpose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) to identify people in an video feed, from v4l2 or NDI, and issue VISCA over IP PTZ commands to a networked camera. MQTT can be used to issue commands to turn the control on/off.
 
-Currently tested and used with a BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module, is used to toggle automatic control on/off. It's setup and run in Docker for tidiness sake. NDI testing is ongoing.
+## Tested cameras:
+
+* BirdDog P200 using [`ffmpeg` with NDI support](https://framagit.org/tytan652/ffmpeg-ndi-patch/) to feed a v4l2 loopback device on Ubuntu. NDI testing is ongoing. 
+
+* Vaddio ConferenceSHOT 10 running newest firmware with VISCA IP support
+
+MQTT is supported to control automatic control on/off. This can be done with [Companion](https://github.com/bitfocus/companion) on a StreamDeck, and its' MQTT module. 
 
 It tracks the middle of all people it finds, so it probably won't do much if there are several people visible.
 
@@ -49,7 +55,7 @@ Will read from `/dev/video0` and automatically start controlling the camera at t
 
 ```
 $ docker run --gpus all --name ptztrack --restart unless-stopped -it \
-    --device /dev/video0 ptztrack:11.2 10.1.1.174
+    --device /dev/video0 ptzcontrol:11.2 10.1.1.174
 ```
 
 If all goes well it should start up with no errors, print out in the console when it's moving, and actually move the camera.

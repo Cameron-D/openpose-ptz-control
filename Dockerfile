@@ -8,7 +8,7 @@ RUN apt-get update && \
     libgoogle-glog-dev libboost-all-dev libcaffe-cuda-dev libhdf5-dev libatlas-base-dev nano python3-setuptools
 
 #for python api
-RUN pip3 install --upgrade pip && pip3 install numpy opencv-python paho-mqtt
+RUN pip3 install --upgrade pip && pip3 install numpy opencv-python paho-mqtt v4l2-python3
 
 #replace cmake as old version has CUDA variable bugs
 RUN wget https://github.com/Kitware/CMake/releases/download/v3.16.0/cmake-3.16.0-Linux-x86_64.tar.gz && \
@@ -37,17 +37,17 @@ RUN cd /openpose/build && \
 ENV LD_LIBRARY_PATH=/openpose/build/python/openpose:/usr/lib
 
 # Installing NDI and compiling python bindings
-COPY NDI/libndi.so.4 /usr/lib/libndi.so
-COPY NDI/include/* /usr/include/
+#COPY NDI/libndi.so.4 /usr/lib/libndi.so
+#OPY NDI/include/* /usr/include/
 
-RUN cd / && \
-    git clone https://github.com/buresu/ndi-python.git && \
-    cd /ndi-python && \
-    git submodule init && git submodule update && \
-    cd lib/pybind11 && git checkout v2.9.1 && \
-    cd /ndi-python && mkdir build && cd build && \
-    cmake .. && cmake --build . --config Release && \
-    cp NDIlib*.so /usr/lib/python3.6/NDIlib.so
+#RUN cd / && \
+#    git clone https://github.com/buresu/ndi-python.git && \
+#    cd /ndi-python && \
+#    git submodule init && git submodule update && \
+#    cd lib/pybind11 && git checkout v2.9.1 && \
+#    cd /ndi-python && mkdir build && cd build && \
+#    cmake .. && cmake --build . --config Release && \
+#    cp NDIlib*.so /usr/lib/python3.6/NDIlib.so
 
 
 WORKDIR /ptztrack

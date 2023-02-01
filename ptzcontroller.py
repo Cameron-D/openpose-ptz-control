@@ -1,6 +1,8 @@
 import cv2, time, argparse, time
 import pyopenpose as op
 import paho.mqtt.client as mqtt
+import os, fcntl
+import v4l2
 from enum import IntEnum
 from signal import signal, SIGINT
 from sys import exit
@@ -21,6 +23,24 @@ class PTZTrack:
     def __init__(self, args):
         self.args = args
         self.move = ViscaMoveControl(self.args)
+        self.zooming = False
+        self.odevice = open("/dev/video1", "wb")
+        
+        # V4L2 Setup
+        cap                         = cv2.VideoCapture(0)
+        ret, im                     = cap.read()
+        height2, width2, channels2  = im.shape
+
+        format                      = v4l2.v4l2_format()
+        format.type                 = v4l2.V4L2_BUF_TYPE_VIDEO_OUTPUT
+        format.fmt.pix.field        = v4l2.V4L2_FIELD_NONE
+        format.fmt.pix.pixelformat  = v4l2.V4L2_PIX_FMT_BGR24
+        format.fmt.pix.width        = 1280
+        format.fmt.pix.height       = 720
+        format.fmt.pix.bytesperline = 1280 * channels2
+        format.fmt.pix.sizeimage    = 1280 * 720 * channels2
+
+        print ("set format result (0 is good):{}".format(fcntl.ioctl(self.odevice, v4l2.VIDIOC_S_FMT, format)))
 
         # OpenPose Setup
         params = dict()
@@ -73,10 +93,17 @@ class PTZTrack:
             self.control_camera = not self.control_camera
             self.mqtt_publish_state()
 
-    def calculate_speed(self, smin: int, val: int, smax: int):
+    def calculate_pan_speed(self, smin: int, val: int, smax: int):
         speed_ratio = (val - smin) / smax
         speed = int(
             ((self.args.speed_max - self.args.speed_min) * speed_ratio)
+            + self.args.speed_min
+        )
+        return speed
+    def calculate_tilt_speed(self, smin: int, val: int, smax: int):
+        speed_ratio = (val - smin) / smax
+        speed = int(
+            ((self.args.speed_max - (self.args.speed_min * 1.75)) * speed_ratio)
             + self.args.speed_min
         )
         return speed
@@ -142,15 +169,17 @@ class PTZTrack:
         r_edge = frame_shape[1] - l_edge
         height = frame_shape[0]
         width = frame_shape[1]
+        lower_edge = int(frame_shape[0] * .45)
+        upper_edge = frame_shape[0] - lower_edge
 
         bounding = [frame_shape[1], height, 0, 0]
 
-        return l_edge, r_edge, height, width, bounding
+        return l_edge, r_edge, height, width, lower_edge, upper_edge, bounding
 
     def process_datum_keypoints(self, frame, datum):
         regions = []
 
-        if datum.poseKeypoints:
+        if datum.poseKeypoints is not None and len(datum.poseKeypoints) > 0:
             for i in range(0, datum.poseKeypoints.shape[0]):
                 p = self.get_keypoints_rectangle(datum.poseKeypoints[i], 0.1)
                 regions.append([p[0], p[1], p[2] - p[0], p[3] - p[1]])
@@ -171,8 +200,21 @@ class PTZTrack:
 
         return bounding
 
+    
+    
     def main_loop(self):
         bounding = []
+        val1   = 10
+        val2   = 10
+        val3   = 10
+        val4   = 10
+        val5   = 10
+        val6   = 10
+        val7   = 10
+        val8   = 10
+        val9   = 10
+        val10  = 10
+
 
         self.move.set_direction(Move.STOP)
         last_direction = self.move.direction
@@ -188,8 +230,10 @@ class PTZTrack:
             # If there is no video data
             if not check:
                 # sleep momentarily so we can't waste time in an endless loop
+                print("No Video Data!")
                 time.sleep(0.01)
                 continue
+
 
             # Publish control state occasionally
             frame_count += 1
@@ -201,7 +245,10 @@ class PTZTrack:
             if not self.control_camera:
                 continue
 
-            l_edge, r_edge, height, width, bounding = self.calculate_edges(frame.shape)
+            l_edge, r_edge, height, width, lower_edge, upper_edge, bounding = self.calculate_edges(frame.shape)
+##            lower_edge = (frame_shape[0] * 0.45)
+##            upper_edge = (frame_shape[0] - lower_edge)
+            
 
             # Pass the frame data to openpose
             openpose_datum = op.Datum()
@@ -216,14 +263,36 @@ class PTZTrack:
                 # calculate the bounding boxes of all the people
                 bounding = self.calculate_boundaries(bounding, regions)
 
+                val1 = val2
+                val2 = val3
+                val3 = val4
+                val4 = val5
+                val5 = val6
+                val6 = val7
+                val7 = val8
+                val8 = val9
+                val9 = val10
+                val10 = (bounding[Edge.TOP] - bounding[Edge.BOTTOM])
+                val11 = (val6 + val7 + val8 + val9 + val10) / 5 
+                val11 = abs(val11)
+                recty1 = (height - val11) * 0.5
+                recty2 = recty1 + val11
+                cv2.rectangle(
+                    frame, 
+                    (20, int(recty1)), 
+                    (20, int(recty2)), 
+                    (255, 255, 0),
+                    4,
+                )
+
                 # Calculate the middle of the box
                 lrmiddle = int(
                     ((bounding[Edge.RIGHT] - bounding[Edge.LEFT]) / 2)
                     + bounding[Edge.LEFT]
                 )
                 udmiddle = int(
-                    ((bounding[Edge.BOTTOM] - bounding[Edge.TOP]) / 2)
-                    + bounding[Edge.TOP]
+                    ((bounding[Edge.TOP] - bounding[Edge.BOTTOM]) / 2)
+                    + bounding[Edge.BOTTOM]
                 )
 
                 # Draw the bounding boxes and middle point
@@ -242,20 +311,47 @@ class PTZTrack:
                     4,
                 )
                 cv2.rectangle(frame, (l_edge, 0), (r_edge, height), (255, 0, 0), 4)
+                cv2.rectangle(frame, (0, lower_edge), (width, upper_edge), (0, 255, 0), 4)
 
                 # Calculate the move speed as a ratio of the distance between the bounding box edge and frame edge.
+                print("Average Height: " + str(val11))
+                print("Zout threshold: " + str(.85 * height))
                 if lrmiddle < l_edge:
                     self.move.set_speed(
-                        self.calculate_speed(0, l_edge - lrmiddle, l_edge)
+                        self.calculate_pan_speed(0, l_edge - lrmiddle, l_edge)
                     )
                     self.move.set_direction(Move.LEFT)
                 elif lrmiddle > r_edge:
-                    self.move.set_speed(self.calculate_speed(r_edge, lrmiddle, width))
+                    self.move.set_speed(
+                         self.calculate_pan_speed(0, lrmiddle - r_edge, l_edge)
+                    )
                     self.move.set_direction(Move.RIGHT)
+                elif udmiddle < lower_edge:
+                    self.move.set_speed(
+                        self.calculate_tilt_speed(0, lower_edge - udmiddle, lower_edge)
+                    )
+                    self.move.set_direction(Move.DOWN)
+                elif udmiddle > upper_edge:
+                    self.move.set_speed(
+                         self.calculate_tilt_speed(0, udmiddle - upper_edge, lower_edge)
+                    )
+                    self.move.set_direction(Move.UP)
+                elif val11 >= (.75 * height):
+                      self.move.set_direction(Move.ZOUT)
+                      self.zooming = True
+
+                elif val11 <= (.55 * height):
+                      self.move.set_direction(Move.ZIN)
+                      self.zooming = True
                 else:
+                    if self.zooming:
+                        self.move.set_direction(Move.ZSTOP)
+                        self.move.do_move()
+                        self.zooming = False
                     self.move.set_speed(self.args.speed_min)
                     self.move.set_direction(Move.STOP)
             else:
+                
                 self.move.set_direction(Move.STOP)
 
             # If either the speed or direction have changed then send the move command to the camera
@@ -269,6 +365,8 @@ class PTZTrack:
             if self.args.ui:
                 if self.show_ui(frame):
                     break
+            #write frame to v4l2 loopback
+            self.odevice.write(frame)
 
 
 if __name__ == "__main__":
